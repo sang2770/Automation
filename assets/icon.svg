@@ -1,0 +1,22 @@
+<!-- Simple SVG icon for the app -->
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="256" height="256" fill="#FF0000" rx="48"/>
+  
+  <!-- YouTube Play Button -->
+  <polygon points="96,80 96,176 176,128" fill="white"/>
+  
+  <!-- Automation Symbol (Gear) -->
+  <g transform="translate(190,190) scale(0.8)">
+    <circle cx="20" cy="20" r="16" fill="none" stroke="white" stroke-width="3"/>
+    <circle cx="20" cy="20" r="6" fill="white"/>
+    <rect x="18" y="2" width="4" height="8" fill="white"/>
+    <rect x="18" y="30" width="4" height="8" fill="white"/>
+    <rect x="2" y="18" width="8" height="4" fill="white"/>
+    <rect x="30" y="18" width="8" height="4" fill="white"/>
+    <rect x="7" y="7" width="4" height="4" fill="white" transform="rotate(45 9 9)"/>
+    <rect x="29" y="29" width="4" height="4" fill="white" transform="rotate(45 31 31)"/>
+    <rect x="29" y="7" width="4" height="4" fill="white" transform="rotate(-45 31 9)"/>
+    <rect x="7" y="29" width="4" height="4" fill="white" transform="rotate(-45 9 31)"/>
+  </g>
+</svg>
