@@ -309,7 +309,7 @@ class YouTubeWorker {
         // Method 1: Go to YouTube → Search keyword → Click first video → Navigate to related videos → Replace with target link
         try {
             // Step 1: Go to YouTube
-            await this.page.goto('https://www.youtube.com/', { waitUntil: 'networkidle' });
+            await this.page.goto('https://www.youtube.com/', { waitUntil: 'domcontentloaded' });
             await this.delay(2000);
 
             // Step 2: Search for keyword if available
@@ -317,25 +317,25 @@ class YouTubeWorker {
                 const randomKeyword = link.keywords[Math.floor(Math.random() * link.keywords.length)];
 
                 // Find and click search box
-                const searchBox = await this.page.waitForSelector('input#search', { timeout: 10000 });
+                const searchBox = await this.page.waitForSelector('input[name="search_query"]', { timeout: 10000 });
                 await searchBox.click();
                 await this.humanType(searchBox, randomKeyword);
 
                 // Submit search
-                const searchButton = await this.page.$('button#search-icon-legacy');
+                const searchButton = await this.page.$('button[aria-label="Search"]');
                 if (searchButton) {
                     await searchButton.click();
                 } else {
                     await searchBox.press('Enter');
                 }
 
-                await this.page.waitForLoadState('networkidle');
+                await this.page.waitForLoadState('domcontentloaded');
                 await this.delay(3000);
 
                 // Step 3: Click on first video result
-                const firstVideo = await this.page.waitForSelector('a#video-title', { timeout: 10000 });
+                const firstVideo = await this.page.waitForSelector('.ytd-item-section-renderer a.yt-core-attributed-string__link', { timeout: 10000 });
                 await firstVideo.click();
-                await this.page.waitForLoadState('networkidle');
+                await this.page.waitForLoadState('domcontentloaded');
                 await this.delay(5000);
 
                 // Step 4: Navigate to related videos section and replace first link
@@ -357,7 +357,7 @@ class YouTubeWorker {
         // Method 2: Go to YouTube → Replace first video link with target link → Click
         try {
             // Step 1: Go to YouTube
-            await this.page.goto('https://www.youtube.com/', { waitUntil: 'networkidle' });
+            await this.page.goto('https://www.youtube.com/', { waitUntil: 'domcontentloaded' });
             await this.delay(2000);
 
             // Step 2: Navigate directly to target video
@@ -374,11 +374,11 @@ class YouTubeWorker {
     async navigateToTargetVideo(targetUrl) {
         try {
             // Navigate directly to the target video
-            await this.page.goto(targetUrl, { waitUntil: 'networkidle' });
+            await this.page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
             await this.delay(3000);
 
             // Wait for video player to load
-            await this.page.waitForSelector('.video-stream', { timeout: 15000 });
+            await this.page.waitForSelector('#ytd-player', { timeout: 15000 });
 
             this.parent.sendMessage("automation-progress", {
                 message: `Worker ${this.workerId}: Navigated to target video`,
@@ -395,35 +395,40 @@ class YouTubeWorker {
 
         try {
             this.parent.sendMessage("automation-progress", {
-                message: `Worker ${this.workerId}: Waiting for ads...`,
+                message: `Worker ${this.workerId}: Checking for ads...`,
             });
 
-            // Wait for ad to appear (check multiple ad selectors)
+            // Wait for ad to appear (check multiple ad selectors based on provided structure)
             const adSelectors = [
-                '.video-ads .videoAdUi',
+                '.video-ads.ytp-ad-module',
+                '.ytp-ad-player-overlay-layout',
                 '.ytp-ad-module',
                 '.ytp-ad-overlay-container',
                 '[class*="ad-showing"]',
-                '.ytp-ad-text'
+                '.ytp-ad-text',
+                '.ytp-ad-player-overlay'
             ];
 
             let adFound = false;
-            const maxWaitTime = 15000; // 15 seconds
+            let adElement = null;
+            const maxWaitTime = 20000; // 20 seconds
             const startTime = Date.now();
 
+            // Check for ads periodically
             while (Date.now() - startTime < maxWaitTime && !adFound) {
                 for (const selector of adSelectors) {
-                    const adElement = await this.page.$(selector);
-                    if (adElement) {
-                        adFound = true;
-                        this.parent.sendMessage("automation-progress", {
-                            message: `Worker ${this.workerId}: Ad detected`,
-                        });
-
-                        if (settings.clickAds) {
-                            await this.clickOnAd(adElement);
+                    const element = await this.page.$(selector);
+                    if (element) {
+                        // Verify the element is visible
+                        const isVisible = await element.isVisible();
+                        if (isVisible) {
+                            adFound = true;
+                            adElement = element;
+                            this.parent.sendMessage("automation-progress", {
+                                message: `Worker ${this.workerId}: Ad detected with selector: ${selector}`,
+                            });
+                            break;
                         }
-                        break;
                     }
                 }
 
@@ -432,14 +437,19 @@ class YouTubeWorker {
                 }
             }
 
-            if (!adFound) {
+            if (adFound && settings.clickAds) {
+                await this.clickOnAdView();
+            } else if (!adFound) {
                 this.parent.sendMessage("automation-progress", {
-                    message: `Worker ${this.workerId}: No ads detected within timeout`,
+                    message: `Worker ${this.workerId}: No ads detected within ${maxWaitTime}ms`,
                 });
             }
 
-            // Watch video for a random duration (10-30 seconds)
-            const watchDuration = 10000 + Math.random() * 20000;
+            // Watch video for a random duration (15-45 seconds)
+            const watchDuration = 15000 + Math.random() * 30000;
+            this.parent.sendMessage("automation-progress", {
+                message: `Worker ${this.workerId}: Watching video for ${Math.round(watchDuration / 1000)}s`,
+            });
             await this.delay(watchDuration);
 
         } catch (error) {
@@ -449,36 +459,185 @@ class YouTubeWorker {
         }
     }
 
-    async clickOnAd(adElement) {
+    async clickOnAdView() {
         try {
-            // Try different click approaches for ads
-            const clickableSelectors = [
-                '.ytp-ad-overlay-close-button',
-                '.ytp-ad-skip-button',
-                '.ytp-ad-overlay-container',
-                adElement
+            this.parent.sendMessage("automation-progress", {
+                message: `Worker ${this.workerId}: Attempting to click on ad view...`,
+            });
+
+            // Define clickable ad elements in priority order based on provided structure
+            const adClickTargets = [
+                // Primary ad button - "Truy cập trang web" button
+                {
+                    selector: '.ytp-ad-button-vm',
+                    name: 'Visit Website Button',
+                    waitTime: 3000
+                },
+                // Advertiser link
+                {
+                    selector: '.ytp-visit-advertiser-link',
+                    name: 'Advertiser Link',
+                    waitTime: 2000
+                },
+                // Avatar lockup card (clickable ad area)
+                {
+                    selector: '.ytp-ad-avatar-lockup-card.ytp-ad-component--clickable',
+                    name: 'Avatar Card',
+                    waitTime: 2000
+                },
+                // General ad overlay container
+                {
+                    selector: '.ytp-ad-player-overlay-layout',
+                    name: 'Overlay Layout',
+                    waitTime: 1500
+                },
+                // Fallback - any clickable ad component
+                {
+                    selector: '.ytp-ad-component--clickable',
+                    name: 'Any Clickable Component',
+                    waitTime: 1500
+                }
             ];
 
-            for (const selector of clickableSelectors) {
+            let clickedSuccessfully = false;
+
+            for (const target of adClickTargets) {
                 try {
-                    const element = typeof selector === 'string' ? await this.page.$(selector) : selector;
-                    if (element) {
-                        await element.click();
+                    // Wait a bit for the ad to fully load
+                    await this.delay(1000);
+
+                    const elements = await this.page.$$(target.selector);
+
+                    if (elements.length > 0) {
+                        // Try clicking on the first visible element
+                        for (const element of elements) {
+                            try {
+                                const isVisible = await element.isVisible();
+                                const isEnabled = await element.isEnabled();
+
+                                if (isVisible && isEnabled) {
+                                    // Scroll element into view if needed
+                                    await element.scrollIntoViewIfNeeded();
+                                    await this.delay(500);
+
+                                    // Try different click methods
+                                    try {
+                                        await element.click({ force: true });
+                                    } catch {
+                                        // Fallback to JavaScript click
+                                        await element.evaluate(el => el.click());
+                                    }
+
+                                    this.parent.sendMessage("automation-progress", {
+                                        message: `Worker ${this.workerId}: Successfully clicked on ${target.name}`,
+                                    });
+
+                                    clickedSuccessfully = true;
+                                    await this.delay(target.waitTime);
+                                    break;
+                                }
+                            } catch (elementError) {
+                                // Continue to next element
+                                continue;
+                            }
+                        }
+
+                        if (clickedSuccessfully) {
+                            break;
+                        }
+                    }
+                } catch (selectorError) {
+                    // Continue to next selector
+                    continue;
+                }
+            }
+
+            if (!clickedSuccessfully) {
+                this.parent.sendMessage("automation-progress", {
+                    message: `Worker ${this.workerId}: Could not find clickable ad elements`,
+                });
+
+                // Fallback: try to click on skip button if available
+                await this.trySkipAd();
+            } else {
+                // Wait after clicking ad to allow page navigation/popup
+                await this.delay(3000);
+
+                // Handle potential new tab/popup
+                await this.handleAdPopup();
+            }
+
+        } catch (error) {
+            this.parent.sendMessage("automation-progress", {
+                message: `Worker ${this.workerId}: Error clicking on ad view: ${error.message}`,
+            });
+
+            // Fallback: try to skip ad
+            await this.trySkipAd();
+        }
+    }
+
+    async trySkipAd() {
+        try {
+            const skipSelectors = [
+                '.ytp-skip-ad-button',
+                '.ytp-ad-skip-button-container button',
+                '[aria-label*="Skip"]',
+                '[aria-label*="Bỏ qua"]'
+            ];
+
+            for (const selector of skipSelectors) {
+                const skipButton = await this.page.$(selector);
+                if (skipButton) {
+                    const isVisible = await skipButton.isVisible();
+                    const isEnabled = await skipButton.isEnabled();
+
+                    if (isVisible && isEnabled) {
+                        await skipButton.click();
                         this.parent.sendMessage("automation-progress", {
-                            message: `Worker ${this.workerId}: Clicked on ad`,
+                            message: `Worker ${this.workerId}: Skipped ad`,
                         });
                         await this.delay(2000);
-                        break;
+                        return;
                     }
-                } catch (clickError) {
-                    // Continue to next selector if click fails
                 }
             }
         } catch (error) {
             this.parent.sendMessage("automation-progress", {
-                message: `Worker ${this.workerId}: Error clicking ad: ${error.message}`,
+                message: `Worker ${this.workerId}: Could not skip ad: ${error.message}`,
             });
         }
+    }
+
+    async handleAdPopup() {
+        try {
+            // Wait for potential popup/new tab
+            await this.delay(2000);
+
+            const pages = this.context.pages();
+            if (pages.length > 1) {
+                // New tab opened, close it and return to original
+                const newPage = pages[pages.length - 1];
+                this.parent.sendMessage("automation-progress", {
+                    message: `Worker ${this.workerId}: Ad opened new tab, closing it`,
+                });
+
+                await newPage.close();
+                await this.delay(1000);
+
+                // Focus back on main page
+                await this.page.bringToFront();
+            }
+        } catch (error) {
+            this.parent.sendMessage("automation-progress", {
+                message: `Worker ${this.workerId}: Error handling ad popup: ${error.message}`,
+            });
+        }
+    }
+
+    async clickOnAd(adElement) {
+        // Legacy method - keeping for compatibility
+        await this.clickOnAdView();
     }
 
     async humanType(element, text) {
