@@ -8,30 +8,25 @@ class YouTubeAutomationUI {
             maxThreads: 3,
             settings: {
                 delayBetweenActions: 2000,
-                waitForAds: true,
-                clickAds: true,
                 randomMethod: true
+            },
+            proxy: {
+                enabled: false,
+                list: []
             }
         };
 
-        this.selectedProfiles = [];
         this.isRunning = false;
         this.currentLinkId = 0;
 
         this.initializeEventListeners();
         this.loadConfiguration();
-        this.loadGPMProfiles();
     }
 
     initializeEventListeners() {
         // IPC listeners
         ipcRenderer.on('worker-message', (event, message) => {
             this.handleWorkerMessage(message);
-        });
-
-        // UI event listeners
-        document.getElementById('refreshProfiles').addEventListener('click', () => {
-            this.loadGPMProfiles();
         });
 
         document.getElementById('addLink').addEventListener('click', () => {
@@ -59,11 +54,22 @@ class YouTubeAutomationUI {
         });
 
         // Settings change listeners
-        ['maxThreads', 'actionDelay', 'waitForAds', 'clickAds', 'randomMethod'].forEach(id => {
+        ['maxThreads', 'actionDelay', 'randomMethod', 'enableProxy', 'proxyList'].forEach(id => {
             const element = document.getElementById(id);
-            element.addEventListener('change', () => {
+            element.addEventListener('change', async () => {
                 this.updateSettingsFromUI();
+                // Auto-save when settings change
+                await this.saveConfiguration();
             });
+        });
+
+        // Enable/disable proxy list based on enable proxy checkbox
+        document.getElementById('enableProxy').addEventListener('change', (e) => {
+            const proxyList = document.getElementById('proxyList');
+            proxyList.disabled = !e.target.checked;
+            if (!e.target.checked) {
+                proxyList.value = '';
+            }
         });
 
         // Bootstrap modal events
@@ -97,99 +103,41 @@ class YouTubeAutomationUI {
         }
     }
 
-    async loadGPMProfiles() {
-        const profilesList = document.getElementById('profilesList');
-        profilesList.innerHTML = '<div class="text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Loading profiles...</div>';
-
-        const result = await ipcRenderer.invoke('load-gpm-profiles');
-
-        if (result.success) {
-            this.renderProfiles(result.profiles);
-            this.addLog(`Loaded ${result.profiles.length} GPM profiles`, 'success');
-        } else {
-            profilesList.innerHTML = `<div class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i>${result.error}</div>`;
-            this.addLog(`Failed to load GPM profiles: ${result.error}`, 'error');
-        }
-    }
-
-    renderProfiles(profiles) {
-        const profilesList = document.getElementById('profilesList');
-
-        if (profiles.length === 0) {
-            profilesList.innerHTML = '<div class="text-muted">No profiles available</div>';
-            return;
-        }
-
-        let html = '';
-        profiles.forEach(profile => {
-            const isSelected = this.selectedProfiles.includes(profile.id);
-            const statusClass = profile.status === 'active' ? 'active' : 'inactive';
-
-            html += `
-                <div class="profile-item ${isSelected ? 'selected' : ''}" data-profile-id="${profile.id}">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="fw-semibold">${profile.name}</div>
-                            <small class="text-muted">ID: ${profile.id}</small>
-                        </div>
-                        <span class="profile-status ${statusClass}">${profile.status}</span>
-                    </div>
-                </div>
-            `;
-        });
-
-        profilesList.innerHTML = html;
-
-        // Add click listeners to profile items
-        document.querySelectorAll('.profile-item').forEach(item => {
-            item.addEventListener('click', () => {
-                this.toggleProfileSelection(item);
-            });
-        });
-    }
-
-    toggleProfileSelection(profileElement) {
-        const profileId = profileElement.dataset.profileId;
-        const isSelected = this.selectedProfiles.includes(profileId);
-
-        if (isSelected) {
-            this.selectedProfiles = this.selectedProfiles.filter(id => id !== profileId);
-            profileElement.classList.remove('selected');
-        } else {
-            this.selectedProfiles.push(profileId);
-            profileElement.classList.add('selected');
-        }
-
-        this.updateConfigFromUI();
-    }
-
     updateUIFromConfig() {
         // Update settings
         document.getElementById('maxThreads').value = this.config.maxThreads || 3;
         document.getElementById('actionDelay').value = this.config.settings?.delayBetweenActions || 2000;
-        document.getElementById('waitForAds').checked = this.config.settings?.waitForAds !== false;
-        document.getElementById('clickAds').checked = this.config.settings?.clickAds !== false;
         document.getElementById('randomMethod').checked = this.config.settings?.randomMethod !== false;
-
-        // Update selected profiles
-        this.selectedProfiles = this.config.profiles || [];
-
+        
+        // Update proxy settings
+        document.getElementById('enableProxy').checked = this.config.proxy?.enabled || false;
+        document.getElementById('proxyList').value = this.config.proxy?.list?.join('\n') || '';
+        document.getElementById('proxyList').disabled = !this.config.proxy?.enabled;
+        
         // Render links
         this.renderLinks();
     }
 
     updateConfigFromUI() {
         this.config.maxThreads = parseInt(document.getElementById('maxThreads').value);
-        this.config.profiles = [...this.selectedProfiles];
         this.updateSettingsFromUI();
     }
 
     updateSettingsFromUI() {
         this.config.settings = {
             delayBetweenActions: parseInt(document.getElementById('actionDelay').value),
-            waitForAds: document.getElementById('waitForAds').checked,
-            clickAds: document.getElementById('clickAds').checked,
             randomMethod: document.getElementById('randomMethod').checked
+        };
+        
+        // Update proxy config
+        const enableProxy = document.getElementById('enableProxy').checked;
+        const proxyListText = document.getElementById('proxyList').value.trim();
+        
+        this.config.proxy = {
+            enabled: enableProxy,
+            list: enableProxy && proxyListText ? 
+                proxyListText.split('\n').map(line => line.trim()).filter(line => line.length > 0) : 
+                []
         };
     }
 
@@ -209,8 +157,8 @@ class YouTubeAutomationUI {
                 '<span class="badge bg-secondary">Disabled</span>';
 
             html += `
-                <div class="list-group-item ${link.enabled ? '' : 'disabled'}">
-                    <div class="d-flex justify-content-between align-items-start">
+                <div class="list-group-item mb-2">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap">
                         <div class="flex-grow-1">
                             <div class="fw-semibold text-truncate" title="${link.url}">
                                 ${link.url}
@@ -256,7 +204,7 @@ class YouTubeAutomationUI {
         modal.show();
     }
 
-    saveLink() {
+    async saveLink() {
         const url = document.getElementById('linkUrl').value.trim();
         const views = parseInt(document.getElementById('linkViews').value);
         const keywordsText = document.getElementById('linkKeywords').value.trim();
@@ -295,6 +243,9 @@ class YouTubeAutomationUI {
 
         this.renderLinks();
 
+        // Auto-save configuration after adding/updating link
+        await this.saveConfiguration();
+
         // Close modal
         const modal = bootstrap.Modal.getInstance(document.getElementById('linkModal'));
         modal.hide();
@@ -307,13 +258,16 @@ class YouTubeAutomationUI {
         }
     }
 
-    deleteLink(linkId) {
+    async deleteLink(linkId) {
         if (confirm('Are you sure you want to delete this link?')) {
             this.config.links = this.config.links.filter((l, index) =>
                 l.id !== linkId && index !== linkId
             );
             this.renderLinks();
             this.addLog('Link deleted', 'info');
+            
+            // Auto-save configuration after deleting link
+            await this.saveConfiguration();
         }
     }
 
@@ -332,11 +286,6 @@ class YouTubeAutomationUI {
         // Validate configuration
         if (this.config.links.filter(l => l.enabled).length === 0) {
             this.showToast('Please add and enable at least one link', 'error');
-            return;
-        }
-
-        if (this.selectedProfiles.length === 0) {
-            this.showToast('Please select at least one GPM profile', 'error');
             return;
         }
 
@@ -390,6 +339,8 @@ class YouTubeAutomationUI {
                 break;
 
             case 'automation-stopped':
+                console.log('Automation stopped with code:', data.code);
+                
                 this.addLog('Automation stopped', 'warning');
                 this.isRunning = false;
                 this.updateRunningState();

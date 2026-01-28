@@ -24,11 +24,6 @@
             YouTube Automation Tool
           </h1>
         </div>
-        <div class="col-auto">
-          <button class="btn btn-outline-light btn-sm" id="refreshProfiles">
-            <i class="fas fa-sync-alt"></i> Refresh Profiles
-          </button>
-        </div>
       </div>
 
       <div class="row">
@@ -36,24 +31,6 @@
         <div class="col-md-6 bg-light border-end">
           <div class="p-3">
             <h4 class="h5 mb-3"><i class="fas fa-cog me-2"></i>Cấu hình</h4>
-
-            <!-- GPM Profiles -->
-            <div class="card mb-3">
-              <div class="card-header">
-                <h6 class="mb-0">
-                  <i class="fas fa-user-circle me-2"></i>GPM Profiles
-                </h6>
-              </div>
-              <div class="card-body">
-                <div id="profilesList">
-                  <div class="text-muted">
-                    <i class="fas fa-spinner fa-spin me-2"></i>Loading
-                    profiles...
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <!-- Links Configuration -->
             <div class="card mb-3">
               <div
@@ -107,34 +84,50 @@
                   <input
                     class="form-check-input"
                     type="checkbox"
-                    id="waitForAds"
-                    checked
-                  />
-                  <label class="form-check-label" for="waitForAds">
-                    Chờ quảng cáo
-                  </label>
-                </div>
-                <div class="form-check mb-2">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
-                    id="clickAds"
-                    checked
-                  />
-                  <label class="form-check-label" for="clickAds">
-                    Click quảng cáo
-                  </label>
-                </div>
-                <div class="form-check mb-2">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
                     id="randomMethod"
                     checked
                   />
                   <label class="form-check-label" for="randomMethod">
-                    Random method
+                    Ngẫu nhiên chọn phương pháp tìm kiếm
                   </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Proxy Configuration -->
+            <div class="card mb-3">
+              <div class="card-header">
+                <h6 class="mb-0">
+                  <i class="fas fa-globe me-2"></i>Proxy Configuration
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="form-check mb-3">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="enableProxy"
+                  />
+                  <label class="form-check-label" for="enableProxy">
+                    Enable Proxy
+                  </label>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Proxy List (one per line)</label>
+                  <textarea
+                    class="form-control form-control-sm"
+                    id="proxyList"
+                    rows="6"
+                    placeholder="Format: ip:port:username:password
+Example:
+192.168.1.1:8080:user:pass
+192.168.1.2:8080:user2:pass2
+192.168.1.3:8080"
+                    disabled
+                  ></textarea>
+                  <small class="form-text text-muted">
+                    Each thread will use proxy in rotation (thread % proxy_count)
+                  </small>
                 </div>
               </div>
             </div>
