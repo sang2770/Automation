@@ -5,7 +5,7 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev",
+    "dev": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 electron . --dev",
     "build": "electron-builder",
     "build-win": "electron-builder --win --publish=never",
     "build-mac": "electron-builder --mac",
@@ -25,10 +25,11 @@
     "electron-builder": "^24.6.4"
   },
   "dependencies": {
-    "playwright": "^1.40.0",
     "axios": "^1.6.0",
+    "cross-env": "^10.1.0",
     "fs-extra": "^11.1.1",
-    "path": "^0.12.7"
+    "path": "^0.12.7",
+    "playwright": "^1.40.0"
   },
   "build": {
     "appId": "com.automation.youtube",
