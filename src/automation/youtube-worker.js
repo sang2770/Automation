@@ -721,7 +721,7 @@ class YouTubeWorker {
     // Method 2: Go to YouTube → Replace first video link with target link → Click
     try {
       // Step 1: Go to YouTube
-      await this.page.goto("https://www.youtube.com/", {
+      await this.page.goto("https://www.youtube.com/results?search_query=home", {
         waitUntil: "domcontentloaded",
       });
 
@@ -734,7 +734,7 @@ class YouTubeWorker {
       });
       await this.delay(2000);
       const videoSelectors = [
-        "yt-lockup-view-model a.yt-lockup-view-model__content-image",
+        "a#video-title",
       ];
       let replaceableVideo = null;
       for (const selector of videoSelectors) {
