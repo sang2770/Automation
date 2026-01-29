@@ -443,7 +443,7 @@ class YouTubeWorker {
       const response = await axios.get(baseUrl, { timeout: 30000 });
 
       if (!response.data.success) {
-        throw new Error(`Failed to start profile: ${response.data.message}`);
+        throw new Error(`Failed to start profile: ${response.data.message}`);f
       }
 
       this.debugPort = response.data.data.remote_debugging_address;
@@ -570,6 +570,9 @@ class YouTubeWorker {
       this.parent.sendMessage("automation-progress", {
         message: `Worker ${this.workerId}: Starting ${method} for ${link.url}`,
       });
+      this.page.setDefaultNavigationTimeout(60000);
+      this.page.setDefaultTimeout(60000);
+
 
       if (method === "method1") {
         await this.executeMethod1(link, settings);
