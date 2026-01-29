@@ -108,12 +108,12 @@ class YouTubeAutomationUI {
         document.getElementById('maxThreads').value = this.config.maxThreads || 3;
         document.getElementById('actionDelay').value = this.config.settings?.delayBetweenActions || 2000;
         document.getElementById('randomMethod').checked = this.config.settings?.randomMethod !== false;
-        
+
         // Update proxy settings
         document.getElementById('enableProxy').checked = this.config.proxy?.enabled || false;
         document.getElementById('proxyList').value = this.config.proxy?.list?.join('\n') || '';
         document.getElementById('proxyList').disabled = !this.config.proxy?.enabled;
-        
+
         // Render links
         this.renderLinks();
     }
@@ -128,15 +128,15 @@ class YouTubeAutomationUI {
             delayBetweenActions: parseInt(document.getElementById('actionDelay').value),
             randomMethod: document.getElementById('randomMethod').checked
         };
-        
+
         // Update proxy config
         const enableProxy = document.getElementById('enableProxy').checked;
         const proxyListText = document.getElementById('proxyList').value.trim();
-        
+
         this.config.proxy = {
             enabled: enableProxy,
-            list: enableProxy && proxyListText ? 
-                proxyListText.split('\n').map(line => line.trim()).filter(line => line.length > 0) : 
+            list: enableProxy && proxyListText ?
+                proxyListText.split('\n').map(line => line.trim()).filter(line => line.length > 0) :
                 []
         };
     }
@@ -265,7 +265,7 @@ class YouTubeAutomationUI {
             );
             this.renderLinks();
             this.addLog('Link deleted', 'info');
-            
+
             // Auto-save configuration after deleting link
             await this.saveConfiguration();
         }
@@ -340,7 +340,7 @@ class YouTubeAutomationUI {
 
             case 'automation-stopped':
                 console.log('Automation stopped with code:', data.code);
-                
+
                 this.addLog('Automation stopped', 'warning');
                 this.isRunning = false;
                 this.updateRunningState();
@@ -361,13 +361,8 @@ class YouTubeAutomationUI {
 
     updateRunningState() {
         console.log('Updating running state:', this.isRunning);
-        
         const startBtn = document.getElementById('startAutomation');
-        const stopBtn = document.getElementById('stopAutomation');
-
         startBtn.disabled = this.isRunning;
-        stopBtn.disabled = !this.isRunning;
-
         if (this.isRunning) {
             startBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Running...';
         } else {

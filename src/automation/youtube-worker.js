@@ -350,7 +350,7 @@ class YouTubeWorker {
           headers: {
             "Content-Type": "application/json",
           },
-          timeout: 60000,
+          timeout: 120000,
         },
       );
 
@@ -440,7 +440,7 @@ class YouTubeWorker {
       baseUrl += `?win_size=${windowWidth},${windowHeight}`;
       baseUrl += `&win_pos=${windowX},${windowY}`;
 
-      const response = await axios.get(baseUrl, { timeout: 60000 });
+      const response = await axios.get(baseUrl, { timeout: 120000 });
 
       if (!response.data.success) {
         throw new Error(`Failed to start profile: ${response.data.message}`); f
@@ -594,7 +594,7 @@ class YouTubeWorker {
       // Step 1: Go to YouTube
       await this.page.goto("https://www.youtube.com/", {
         waitUntil: "domcontentloaded",
-        timeout: 60000,
+        timeout: 120000,
       });
       await this.delay(2000);
 
@@ -724,7 +724,7 @@ class YouTubeWorker {
       // Step 1: Go to YouTube
       await this.page.goto("https://www.youtube.com/results?search_query=home", {
         waitUntil: "domcontentloaded",
-        timeout: 60000,
+        timeout: 120000,
       });
 
       // Scroll to load videos
