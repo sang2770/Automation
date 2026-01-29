@@ -151,14 +151,20 @@ const { TOTP } = require("totp-generator"); // For generating 2FA codes
       console.log(`Tab mới URL: ${reviewPermissionsPage.url()}`);
 
       console.log("🔑 Đang xử lý nhập OTP...");
-      const otpCode = await get2FACode(secretKey);
-      await reviewPermissionsPage.fill(
-        'input[type="tel"], input[aria-label*="code"]',
-        otpCode,
-      );
-      await delay(1000);
-      await reviewPermissionsPage.click('#totpNext, button[type="submit"]');
-      console.log("✅ OTP đã được nhập thành công.");
+      try {
+        const otpCode = await get2FACode(secretKey);
+        await reviewPermissionsPage.fill(
+          'input[type="tel"], input[aria-label*="code"]',
+          otpCode,
+        );
+        await delay(1000);
+        await reviewPermissionsPage.click('#totpNext, button[type="submit"]');
+        console.log("✅ OTP đã được nhập thành công.");
+      } catch (error) {
+        console.log(
+          "⚠️ Không cần nhập OTP hoặc có lỗi xảy ra: " + error.message,
+        );
+      }
 
       //   click text Nâng cao or Advanced
       await reviewPermissionsPage.waitForTimeout(3000);
