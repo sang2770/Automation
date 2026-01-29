@@ -443,7 +443,7 @@ class YouTubeWorker {
       const response = await axios.get(baseUrl, { timeout: 30000 });
 
       if (!response.data.success) {
-        throw new Error(`Failed to start profile: ${response.data.message}`);f
+        throw new Error(`Failed to start profile: ${response.data.message}`); f
       }
 
       this.debugPort = response.data.data.remote_debugging_address;
@@ -570,9 +570,6 @@ class YouTubeWorker {
       this.parent.sendMessage("automation-progress", {
         message: `Worker ${this.workerId}: Starting ${method} for ${link.url}`,
       });
-      this.page.setDefaultNavigationTimeout(60000);
-      this.page.setDefaultTimeout(60000);
-
 
       if (method === "method1") {
         await this.executeMethod1(link, settings);
@@ -597,6 +594,7 @@ class YouTubeWorker {
       // Step 1: Go to YouTube
       await this.page.goto("https://www.youtube.com/", {
         waitUntil: "domcontentloaded",
+        timeout: 60000,
       });
       await this.delay(2000);
 
@@ -726,6 +724,7 @@ class YouTubeWorker {
       // Step 1: Go to YouTube
       await this.page.goto("https://www.youtube.com/results?search_query=home", {
         waitUntil: "domcontentloaded",
+        timeout: 60000,
       });
 
       // Scroll to load videos
