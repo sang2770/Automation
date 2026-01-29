@@ -588,23 +588,48 @@ class YouTubeWorker {
     }
   }
 
+  async smartWait(selector, {
+    timeout = 8000,
+    state = "visible",
+    fallbackDelay = 300
+  } = {}) {
+    try {
+      return await this.page.waitForSelector(selector, { timeout, state });
+    } catch {
+      await this.page.waitForTimeout(fallbackDelay);
+      return null;
+    }
+  }
+
+
+  async scrollUntil(selector, maxScroll = 5) {
+    for (let i = 0; i < maxScroll; i++) {
+      const el = await this.page.$(selector);
+      if (el) return el;
+
+      await this.page.evaluate(() => {
+        window.scrollBy(0, window.innerHeight);
+      });
+      await this.page.waitForTimeout(800);
+    }
+    return null;
+  }
+
   async executeMethod1(link, settings) {
     // Method 1: Go to YouTube → Search keyword → Click first video → Navigate to related videos → Replace with target link
     try {
       // Step 1: Go to YouTube
       await this.page.goto("https://www.youtube.com/", {
         waitUntil: "domcontentloaded",
-        timeout: 120000,
+        timeout: 60000,
       });
-      await this.delay(2000);
-
       // Step 2: Search for keyword if available
       if (link.keywords && link.keywords.length > 0) {
         const randomKeyword =
           link.keywords[Math.floor(Math.random() * link.keywords.length)];
         // #search-button-narrow
         try {
-          const searchButtonNarrow = await this.page.$("#search-button-narrow");
+          const searchButtonNarrow = await this.smartWait("#search-button-narrow", { timeout: 3000 });
           if (searchButtonNarrow) {
             await searchButtonNarrow.click();
           }
@@ -614,98 +639,43 @@ class YouTubeWorker {
         }
 
         // Find and click search box
-        const searchBox = await this.page.$('input[name="search_query"]');
+        const searchBox = await this.smartWait(
+          'input[name="search_query"]',
+          { timeout: 15000 }
+        );
         await searchBox.click();
         await this.humanType(searchBox, randomKeyword);
 
         // Submit search
-        const searchButton = await this.page.$('button[aria-label="Search"]');
-        if (searchButton) {
-          await searchButton.click();
-        } else {
-          await searchBox.press("Enter");
-        }
+        await searchBox.press("Enter");
 
         await this.page.waitForLoadState("domcontentloaded");
-        await this.delay(3000);
-
-        // Scroll to load videos
-        await this.page.evaluate(async () => {
-          for (let i = 0; i < 2; i++) {
-            window.scrollBy(0, window.innerHeight);
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-          }
-        });
-
-        await this.delay(2000);
-
         // Step 3: Click on first video result
-        const listVideos = await this.page.$$(".ytd-video-renderer");
-        let firstVideo = null;
-        for (const video of listVideos) {
-          try {
-            // find default overlay-style="DEFAULT"
-            await video.$('[overlay-style="DEFAULT"]');
-            firstVideo = await video.$("a#video-title");
-            break;
-          } catch {
-            continue;
-          }
-        }
+        const firstVideo = await this.scrollUntil(
+          'ytd-video-renderer a#video-title[href*="watch"]'
+        );
         if (!firstVideo) {
           this.parent.sendMessage("automation-progress", {
-            message: `Worker ${this.workerId}: No valid video found in search results, using direct navigation`,
+            message: `Worker ${this.workerId}: No search result → fallback`,
           });
           await this.navigateToTargetVideo(link.url);
           return;
         }
+
         await firstVideo.click();
         await this.page.waitForLoadState("domcontentloaded");
-        for (let i = 0; i < 3; i++) {
-          await this.page.evaluate(() => {
-            window.scrollBy(0, window.innerHeight);
-          });
-          await this.delay(2000);
-        }
-        const videoSelectors = ["yt-lockup-view-model a"];
-        let replaceableVideo = null;
 
-        for (const selector of videoSelectors) {
-          try {
-            this.parent.sendMessage("automation-progress", {
-              message: `Worker ${this.workerId}: Waiting for ${selector} (max 2s)...`,
-            });
+        const relatedVideo = await this.scrollUntil(
+          'yt-lockup-view-model a[href*="watch"]'
+        );
 
-            replaceableVideo = await this.page.waitForSelector(selector, {
-              timeout: 2000,
-              state: "attached", // Element exists in DOM
-            });
-
-            if (replaceableVideo) {
-              // Verify nó có href hợp lệ không
-              const href = await replaceableVideo.getAttribute("href");
-              if (href && href.includes("watch")) {
-                this.parent.sendMessage("automation-progress", {
-                  message: `Worker ${this.workerId}: Found valid video with ${selector}`,
-                });
-                break;
-              } else {
-                replaceableVideo = null;
-                continue;
-              }
-            }
-          } catch (e) {
-            // Timeout hoặc error, thử selector tiếp theo
-            continue;
-          }
-        }
-        if (!replaceableVideo) {
+        if (!relatedVideo) {
           this.parent.sendMessage("automation-progress", {
-            message: `Worker ${this.workerId}: No replaceable video found, using direct navigation`,
+            message: `Worker ${this.workerId}: No related video → direct`,
           });
         }
         // Step 4: Navigate to related videos section and replace first link
-        await this.navigateToTargetVideo(link.url, replaceableVideo);
+        await this.navigateToTargetVideo(link.url, relatedVideo);
       } else {
         // If no keywords, go directly to method 2 approach
         await this.navigateToTargetVideo(link.url);
@@ -719,125 +689,109 @@ class YouTubeWorker {
   }
 
   async executeMethod2(link, settings) {
-    // Method 2: Go to YouTube → Replace first video link with target link → Click
     try {
-      // Step 1: Go to YouTube
-      await this.page.goto("https://www.youtube.com/results?search_query=home", {
-        waitUntil: "domcontentloaded",
-        timeout: 120000,
-      });
+      /* ===============================
+         STEP 1: GOTO YOUTUBE RESULTS
+      ================================ */
+      await this.page.goto(
+        "https://www.youtube.com/results?search_query=home",
+        {
+          waitUntil: "domcontentloaded",
+          timeout: 60000,
+        }
+      );
 
-      // Scroll to load videos
-      await this.page.evaluate(async () => {
-        for (let i = 0; i < 3; i++) {
-          window.scrollBy(0, window.innerHeight);
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-        }
-      });
-      await this.delay(2000);
-      const videoSelectors = [
-        "a#video-title",
-      ];
-      let replaceableVideo = null;
-      for (const selector of videoSelectors) {
-        try {
-          replaceableVideo = await this.page.waitForSelector(selector, {
-            timeout: 10000,
-          });
-          if (replaceableVideo) {
-            break;
-          }
-        } catch {
-          continue;
-        }
+      /* ===============================
+         STEP 2: FIND FIRST VIDEO (ADAPTIVE)
+      ================================ */
+      const replaceableVideo = await this.scrollUntil(
+        'ytd-video-renderer a#video-title[href*="watch"]',
+        5
+      );
+
+      if (!replaceableVideo) {
+        this.parent.sendMessage("automation-progress", {
+          message: `Worker ${this.workerId}: No video found → direct navigation`,
+        });
       }
-      // if (!replaceableVideo) {
-      //   this.parent.sendMessage("automation-progress", {
-      //     message: `Worker ${this.workerId}: No replaceable video found on homepage, using direct navigation`,
-      //   });
-      // }
-      // Step 2: Navigate directly to target video
+
+      /* ===============================
+         STEP 3: NAVIGATE TO TARGET
+      ================================ */
       await this.navigateToTargetVideo(link.url, replaceableVideo);
 
-      // Step 3: Wait for ads and click if enabled
+      /* ===============================
+         STEP 4: HANDLE ADS
+      ================================ */
       await this.handleAds(settings);
-    } catch (error) {
-      throw new Error(`Method 2 failed: ${error.message}`);
+
+    } catch (err) {
+      throw new Error(`Method2 optimized failed: ${err.message}`);
     }
   }
 
+
   async navigateToTargetVideo(targetUrl, replaceableVideo = null) {
     try {
-      // this.parent.sendMessage("automation-progress", {
-      //   message: `Worker ${this.workerId}: Navigating to target video via replaceable element ${replaceableVideo ? "found" : "not found"}`,
-      // });
+      /* ===============================
+         CASE 1: CÓ VIDEO CÓ THỂ REPLACE
+      ================================ */
       if (replaceableVideo) {
-        try {
-          // const currentUrl = await replaceableVideo.getAttribute("href");
-          // this.parent.sendMessage("automation-progress", {
-          //   message: `Worker ${this.workerId}: Current replaceable video URL is ${currentUrl}`,
-          // });
+        const replaced = await this.page.evaluate(
+          ({ el, targetUrl }) => {
+            if (!el || !el.href) return false;
 
-          const elementSelector = await replaceableVideo.evaluate((el) => {
-            if (el.id) return `#${el.id}`;
-            if (el.className) return `.${el.className.split(" ").join(".")}`;
-            return el.tagName.toLowerCase();
-          });
+            // Replace trực tiếp element hiện tại
+            el.href = targetUrl;
 
-          // Replace href thông qua page.evaluate
-          const success = await this.page.evaluate(
-            ({ elementSelector, targetUrl }) => {
-              const element = document.querySelector(elementSelector);
-              if (element?.href) {
-                document
-                  .querySelectorAll(`[href="${element.href}"]`)
-                  .forEach((el) => {
-                    el.href = targetUrl;
-                  });
-                element.href = targetUrl;
-                return true;
-              }
-              return false;
-            },
-            { elementSelector, targetUrl },
-          );
+            // Replace các link trùng href (YouTube hay clone node)
+            document
+              .querySelectorAll(`a[href="${el.href}"]`)
+              .forEach(a => (a.href = targetUrl));
 
-          if (!success) {
-            throw new Error("Failed to update href");
+            return true;
+          },
+          {
+            el: replaceableVideo,
+            targetUrl,
           }
-        } catch (e) {
-          // this.parent.sendMessage("automation-progress", {
-          //   message: `Worker ${this.workerId}: Error replacing video link: ${e.message}, navigating directly`,
-          // });
-          await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
-        } finally {
+        ).catch(() => false);
+
+        // Click nếu replace OK
+        if (replaced) {
           try {
-            await this.page.click(`[href="${targetUrl}"]`);
+            await replaceableVideo.click({ timeout: 3000 });
           } catch {
-            // Ignore
             await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
-          } finally {
-            if (targetUrl !== this.page.url()) {
-              await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
-            }
           }
+        } else {
+          await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
         }
+
+        /* ===============================
+           CASE 2: KHÔNG CÓ VIDEO → DIRECT
+        ================================ */
       } else {
         await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
       }
-      // Navigate directly to the target video
-      await this.delay(3000);
 
-      // Wait for video player to load
-      await this.page.waitForSelector("#ytd-player", { timeout: 15000 });
+      /* ===============================
+         WAIT VIDEO PLAYER (ADAPTIVE)
+      ================================ */
+      await this.page.waitForSelector(
+        "#ytd-player, video",
+        { timeout: 15000 }
+      );
 
       this.parent.sendMessage("automation-progress", {
         message: `Worker ${this.workerId}: Navigated to target video`,
       });
-    } catch (error) {
-      throw new Error(`Failed to navigate to target video: ${error.message}`);
+
+    } catch (err) {
+      throw new Error(`navigateToTargetVideo failed: ${err.message}`);
     }
   }
+
 
   async handleAds(settings) {
     try {
@@ -1042,7 +996,7 @@ class YouTubeWorker {
   async humanType(element, text) {
     for (const char of text) {
       await element.type(char);
-      await this.delay(50 + Math.random() * 100);
+      await this.delay(50);
     }
   }
 
