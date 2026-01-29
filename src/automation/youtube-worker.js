@@ -469,7 +469,7 @@ class YouTubeWorker {
 
     // Grid layout: 3 rows x 4 columns
     const rows = 3;
-    const cols = 4;
+    const cols = 3;
     const maxGridPositions = rows * cols; // 12 positions
 
     // Cycle through grid positions if workerId exceeds available positions

@@ -21,6 +21,9 @@ class YouTubeAutomationUI {
 
         this.initializeEventListeners();
         this.loadConfiguration();
+
+        // Set up emergency reset for debugging
+        window.emergencyReset = () => this.emergencyReset();
     }
 
     initializeEventListeners() {
@@ -108,12 +111,12 @@ class YouTubeAutomationUI {
         document.getElementById('maxThreads').value = this.config.maxThreads || 3;
         document.getElementById('actionDelay').value = this.config.settings?.delayBetweenActions || 2000;
         document.getElementById('randomMethod').checked = this.config.settings?.randomMethod !== false;
-        
+
         // Update proxy settings
         document.getElementById('enableProxy').checked = this.config.proxy?.enabled || false;
         document.getElementById('proxyList').value = this.config.proxy?.list?.join('\n') || '';
         document.getElementById('proxyList').disabled = !this.config.proxy?.enabled;
-        
+
         // Render links
         this.renderLinks();
     }
@@ -128,15 +131,15 @@ class YouTubeAutomationUI {
             delayBetweenActions: parseInt(document.getElementById('actionDelay').value),
             randomMethod: document.getElementById('randomMethod').checked
         };
-        
+
         // Update proxy config
         const enableProxy = document.getElementById('enableProxy').checked;
         const proxyListText = document.getElementById('proxyList').value.trim();
-        
+
         this.config.proxy = {
             enabled: enableProxy,
-            list: enableProxy && proxyListText ? 
-                proxyListText.split('\n').map(line => line.trim()).filter(line => line.length > 0) : 
+            list: enableProxy && proxyListText ?
+                proxyListText.split('\n').map(line => line.trim()).filter(line => line.length > 0) :
                 []
         };
     }
@@ -265,7 +268,7 @@ class YouTubeAutomationUI {
             );
             this.renderLinks();
             this.addLog('Link deleted', 'info');
-            
+
             // Auto-save configuration after deleting link
             await this.saveConfiguration();
         }
@@ -278,6 +281,8 @@ class YouTubeAutomationUI {
     }
 
     async startAutomation() {
+        console.log('Start automation clicked, current isRunning state:', this.isRunning);
+
         if (this.isRunning) {
             this.showToast('Automation is already running', 'warning');
             return;
@@ -305,18 +310,39 @@ class YouTubeAutomationUI {
     }
 
     async stopAutomation() {
-        if (!this.isRunning) {
-            this.showToast('No automation is currently running', 'warning');
-            return;
+        console.log('Stop automation clicked, forcing isRunning = false');
+
+        // Force reset state immediately
+        this.isRunning = false;
+        this.updateRunningState();
+        this.addLog('Forcing stop automation...', 'warning');
+
+        // Still try to stop via IPC but don't depend on it
+        try {
+            const result = await ipcRenderer.invoke('stop-automation');
+            if (result.success) {
+                this.addLog('Automation stop signal sent', 'info');
+            } else {
+                this.addLog(`Stop signal failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            this.addLog(`Stop error: ${error.message}`, 'error');
         }
 
-        const result = await ipcRenderer.invoke('stop-automation');
+        this.showToast('Automation stopped/reset', 'info');
+    }
 
-        if (result.success) {
-            this.addLog('Stopping automation...', 'warning');
-        } else {
-            this.addLog(`Failed to stop automation: ${result.error}`, 'error');
-        }
+    // Emergency reset method - can be called from console if UI gets stuck
+    emergencyReset() {
+        console.log('EMERGENCY RESET - Forcing all states to false');
+        this.isRunning = false;
+        this.updateRunningState();
+        this.resetStats();
+        this.addLog('EMERGENCY RESET: All states cleared', 'warning');
+        this.showToast('Emergency reset completed', 'info');
+
+        // Make this available globally for debugging
+        window.emergencyReset = () => this.emergencyReset();
     }
 
     handleWorkerMessage(message) {
@@ -332,15 +358,25 @@ class YouTubeAutomationUI {
                 break;
 
             case 'automation-complete':
+                console.log('Automation completed, forcing isRunning = false');
                 this.addLog('Automation completed successfully', 'success');
                 this.isRunning = false;
                 this.updateRunningState();
                 this.showToast('Automation completed', 'success');
+                // Force UI update multiple times to ensure state is reset
+                setTimeout(() => {
+                    console.log('Force update 1, isRunning:', this.isRunning);
+                    this.updateRunningState();
+                }, 100);
+                setTimeout(() => {
+                    console.log('Force update 2, isRunning:', this.isRunning);
+                    this.updateRunningState();
+                }, 500);
                 break;
 
             case 'automation-stopped':
                 console.log('Automation stopped with code:', data.code);
-                
+
                 this.addLog('Automation stopped', 'warning');
                 this.isRunning = false;
                 this.updateRunningState();
@@ -361,17 +397,20 @@ class YouTubeAutomationUI {
 
     updateRunningState() {
         console.log('Updating running state:', this.isRunning);
-        
+
         const startBtn = document.getElementById('startAutomation');
         const stopBtn = document.getElementById('stopAutomation');
 
         startBtn.disabled = this.isRunning;
-        stopBtn.disabled = !this.isRunning;
+        // Keep stop button always enabled for emergency stop/reset
+        stopBtn.disabled = false;
 
         if (this.isRunning) {
             startBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Running...';
+            stopBtn.innerHTML = '<i class="fas fa-stop me-2"></i>Stop/Reset';
         } else {
             startBtn.innerHTML = '<i class="fas fa-play me-2"></i>Start Automation';
+            stopBtn.innerHTML = '<i class="fas fa-stop me-2"></i>Reset State';
         }
     }
 
