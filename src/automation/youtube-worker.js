@@ -749,6 +749,11 @@ class YouTubeWorker {
           continue;
         }
       }
+      if (!replaceableVideo) {
+        this.parent.sendMessage("automation-progress", {
+          message: `Worker ${this.workerId}: No replaceable video found on homepage, using direct navigation`,
+        });
+      }
       // Step 2: Navigate directly to target video
       await this.navigateToTargetVideo(link.url, replaceableVideo);
 
@@ -803,14 +808,15 @@ class YouTubeWorker {
             message: `Worker ${this.workerId}: Error replacing video link: ${e.message}, navigating directly`,
           });
           await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+        } finally {
+          try {
+            await this.page.click(`[href="${targetUrl}"]`);
+          } catch {
+            // Ignore
+            await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+          }
         }
       } else {
-        await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
-      }
-      try {
-        await this.page.click(`[href="${targetUrl}"]`);
-      } catch {
-        // Ignore
         await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
       }
       // Navigate directly to the target video
