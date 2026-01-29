@@ -37,10 +37,6 @@ class AutomationWorker {
     };
 
     try {
-      this.sendMessage("automation-progress", {
-        message: "Starting YouTube automation...",
-      });
-
       this.sendMessage("automation-update", {
         total: this.stats.total,
         completed: this.stats.completed,
@@ -65,24 +61,31 @@ class AutomationWorker {
         }
       });
 
-      // Create concurrent task execution
-      const maxConcurrentTasks = Math.min(config.maxThreads, tasks.length);
+      // Grid layout for positioning (3 rows x 4 columns = 12 positions)
+      const gridPositions = 12; // 3 rows x 4 columns for positioning
+      const maxConcurrentTasks = config.maxThreads; // Remove grid limitation
       let taskIndex = 0;
       const runningTasks = new Set();
 
       this.sendMessage("automation-progress", {
-        message: `Starting ${maxConcurrentTasks} concurrent tasks for ${tasks.length} total tasks`,
+        message: `Starting ${maxConcurrentTasks} concurrent tasks. Total tasks: ${tasks.length}`,
       });
+
+      if (maxConcurrentTasks > gridPositions) {
+        this.sendMessage("automation-progress", {
+          message: `ℹ️  Running ${maxConcurrentTasks} workers.`,
+        });
+      }
 
       // Function to process a single task
       const processTask = async (task, workerId) => {
-        const worker = new YouTubeWorker(workerId, null, this);
+        const worker = new YouTubeWorker(workerId, null, this); // Use workerId for positioning
         this.workers.push(worker);
 
         try {
           // Get proxy for this worker (rotate through available proxies)
           const proxyConfig = this.getProxyForWorker(workerId, config);
-          
+
           // Create new profile for this specific task
           await worker.createNewProfile(task.link, proxyConfig);
           await worker.initialize();
@@ -94,8 +97,10 @@ class AutomationWorker {
           try {
             await worker.processTask(task, config.settings);
             this.stats.successful++;
+
+            const gridPos = worker.calculateGridPosition(workerId);
             this.sendMessage("automation-progress", {
-              message: `Worker ${workerId}: Successfully processed ${task.link.url} (${task.method})`,
+              message: `${gridPos.gridInfo}: Successfully processed ${task.link.url} (${task.method})`,
             });
           } catch (error) {
             console.error(
@@ -103,8 +108,10 @@ class AutomationWorker {
               error,
             );
             this.stats.failed++;
+
+            const gridPos = worker.calculateGridPosition(workerId);
             this.sendMessage("automation-progress", {
-              message: `Worker ${workerId}: Failed task ${task.taskId} - ${error.message}`,
+              message: `${gridPos.gridInfo}: Failed task ${task.taskId} - ${error.message}`,
             });
           }
 
@@ -131,8 +138,17 @@ class AutomationWorker {
           if (!this.isRunning || taskIndex >= tasks.length) break;
 
           const currentTask = tasks[taskIndex];
-          const workerId = taskIndex;
+          const workerId = taskIndex; // Use taskIndex as workerId
           taskIndex++;
+
+          const gridPos = new YouTubeWorker(
+            workerId,
+            null,
+            this,
+          ).calculateGridPosition(workerId);
+          this.sendMessage("automation-progress", {
+            message: `Task ${taskIndex}/${tasks.length}: Starting at ${gridPos.gridInfo} - ${currentTask.link.url}`,
+          });
 
           // Start the task
           const taskPromise = processTask(currentTask, workerId).finally(() => {
@@ -220,34 +236,39 @@ class AutomationWorker {
   }
 
   getProxyForWorker(workerId, config) {
-    if (!config.proxy || !config.proxy.enabled || !config.proxy.list || config.proxy.list.length === 0) {
+    if (
+      !config.proxy ||
+      !config.proxy.enabled ||
+      !config.proxy.list ||
+      config.proxy.list.length === 0
+    ) {
       return null;
     }
 
     const proxyIndex = workerId % config.proxy.list.length;
     const proxyString = config.proxy.list[proxyIndex];
-    
+
     // Parse proxy string: ip:port:username:password or ip:port
-    const parts = proxyString.split(':');
+    const parts = proxyString.split(":");
     if (parts.length >= 2) {
       const proxy = {
         server: `http://${parts[0]}:${parts[1]}`,
         host: parts[0],
-        port: parts[1]
+        port: parts[1],
       };
-      
+
       if (parts.length >= 4) {
         proxy.username = parts[2];
         proxy.password = parts[3];
       }
-      
+
       this.sendMessage("automation-progress", {
         message: `Worker ${workerId}: Using proxy ${proxy.server}`,
       });
-      
+
       return proxy;
     }
-    
+
     return null;
   }
 
@@ -255,6 +276,18 @@ class AutomationWorker {
     if (process.send) {
       process.send({ type, data });
     }
+  }
+
+  getGridStatus(gridSlots) {
+    // This method is no longer needed since we removed grid slot limitations
+    // Keeping for backward compatibility
+    return {
+      total: "unlimited",
+      occupied: this.workers.length,
+      available: "unlimited",
+      occupancy: `${this.workers.length}/unlimited`,
+      details: [],
+    };
   }
 
   delay(ms) {
@@ -284,7 +317,7 @@ class YouTubeWorker {
         group_name: "All",
         browser_core: "chromium",
         browser_name: "Chrome",
-        browser_version: "139.0.7258.139",
+        browser_version: "142.0.7444.163",
         is_random_browser_version: false,
         raw_proxy: "",
         startup_urls: "",
@@ -298,7 +331,7 @@ class YouTubeWorker {
         is_masked_media_device: true,
         is_random_os: false,
         os: "Windows 11",
-        webrtc_mode: 2
+        webrtc_mode: 2,
       };
 
       // Add proxy if provided
@@ -328,7 +361,7 @@ class YouTubeWorker {
       this.profileId = this.createdProfileId;
 
       this.parent.sendMessage("automation-progress", {
-        message: `Worker ${this.workerId}: Created new GPM profile ${this.profileId}${proxyConfig ? ` with proxy ${proxyConfig.server}` : ''}`,
+        message: `Worker ${this.workerId}: Created new GPM profile ${this.profileId}${proxyConfig ? ` with proxy ${proxyConfig.server}` : ""}`,
       });
 
       return this.profileId;
@@ -390,19 +423,32 @@ class YouTubeWorker {
     }
   }
 
-  async startGPMProfile() {
+  async startGPMProfile(options = {}) {
     try {
-      // Start the profile using GPMLogin API
-      const response = await axios.get(
-        `${baseGPMAPIUrl}/api/v3/profiles/start/${this.profileId}`,
-        { timeout: 10000 },
-      );
+      // Calculate grid position for 3 rows x 4 columns layout
+      const { width, height, x, y } = this.calculateGridPosition(this.workerId);
+
+      let baseUrl = `${baseGPMAPIUrl}/api/v3/profiles/start/${this.profileId}`;
+
+      // Use calculated grid dimensions or custom options
+      const windowWidth = options.width || width;
+      const windowHeight = options.height || height;
+      const windowX = options.x || x;
+      const windowY = options.y || y;
+
+      // Start the profile using GPMLogin API with grid positioning
+      baseUrl += `?win_size=${windowWidth},${windowHeight}`;
+      baseUrl += `&win_pos=${windowX},${windowY}`;
+
+      const response = await axios.get(baseUrl, { timeout: 30000 });
 
       if (!response.data.success) {
         throw new Error(`Failed to start profile: ${response.data.message}`);
       }
 
       this.debugPort = response.data.data.remote_debugging_address;
+
+      const gridInfo = this.getGridInfo();
       this.parent.sendMessage("automation-progress", {
         message: `Worker ${this.workerId}: Started GPMLogin profile ${this.profileId}`,
       });
@@ -414,6 +460,68 @@ class YouTubeWorker {
       }
       throw new Error(`Failed to start GPMLogin profile: ${error.message}`);
     }
+  }
+
+  calculateGridPosition(workerId) {
+    // Screen dimensions (you can adjust these based on your screen resolution)
+    const screenWidth = 1920; // Adjust to your screen width
+    const screenHeight = 1080; // Adjust to your screen height
+
+    // Grid layout: 3 rows x 4 columns
+    const rows = 3;
+    const cols = 4;
+    const maxGridPositions = rows * cols; // 12 positions
+
+    // Cycle through grid positions if workerId exceeds available positions
+    const gridPosition = workerId % maxGridPositions;
+
+    // Calculate window dimensions with small margins
+    const margin = 2; // 2px margin between windows
+    const windowWidth = Math.floor((screenWidth - (cols + 1) * margin) / cols);
+    const windowHeight = Math.floor(
+      (screenHeight - (rows + 1) * margin) / rows,
+    );
+
+    // Calculate grid position based on cycled workerId
+    const col = gridPosition % cols; // Column (0-3)
+    const row = Math.floor(gridPosition / cols) % rows; // Row (0-2)
+
+    // Calculate window position with margins
+    const x = col * (windowWidth + margin) + margin;
+    const y = row * (windowHeight + margin) + margin;
+
+    // Add small offset for overlapping windows (if multiple workers use same grid position)
+    const cycle = Math.floor(workerId / maxGridPositions);
+    const offsetX = cycle * 20; // 20px offset for each cycle
+    const offsetY = cycle * 20; // 20px offset for each cycle
+
+    return {
+      width: windowWidth,
+      height: windowHeight,
+      x: x + offsetX,
+      y: y + offsetY,
+      col: col,
+      row: row,
+      cycle: cycle,
+      gridInfo:
+        cycle > 0
+          ? `Grid[${row + 1},${col + 1}]+${cycle}` // Show cycle number if overlapping
+          : `Grid[${row + 1},${col + 1}]`, // Normal grid position
+    };
+  }
+
+  getGridInfo() {
+    const gridPos = this.calculateGridPosition(this.workerId);
+    return {
+      workerId: this.workerId,
+      gridPosition: gridPos.gridInfo,
+      coordinates: `(${gridPos.x}, ${gridPos.y})`,
+      size: `${gridPos.width}x${gridPos.height}`,
+      row: gridPos.row + 1,
+      col: gridPos.col + 1,
+      cycle: gridPos.cycle,
+      isOverlapped: gridPos.cycle > 0,
+    };
   }
 
   async connectToProfile() {
@@ -493,12 +601,19 @@ class YouTubeWorker {
       if (link.keywords && link.keywords.length > 0) {
         const randomKeyword =
           link.keywords[Math.floor(Math.random() * link.keywords.length)];
+        // #search-button-narrow
+        try {
+          const searchButtonNarrow = await this.page.$("#search-button-narrow");
+          if (searchButtonNarrow) {
+            await searchButtonNarrow.click();
+          }
+          await this.delay(2000);
+        } catch (error) {
+          // TODO
+        }
 
         // Find and click search box
-        const searchBox = await this.page.waitForSelector(
-          'input[name="search_query"]',
-          { timeout: 10000 },
-        );
+        const searchBox = await this.page.$('input[name="search_query"]');
         await searchBox.click();
         await this.humanType(searchBox, randomKeyword);
 
@@ -513,41 +628,73 @@ class YouTubeWorker {
         await this.page.waitForLoadState("domcontentloaded");
         await this.delay(3000);
 
+        // Scroll to load videos
+        await this.page.evaluate(async () => {
+          for (let i = 0; i < 2; i++) {
+            window.scrollBy(0, window.innerHeight);
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        });
+
+        await this.delay(2000);
+
         // Step 3: Click on first video result
-        const listSelector = [
-          ".ytd-item-section-renderer a.yt-core-attributed-string__link",
-          ".ytd-video-renderer a",
-        ];
+        const listVideos = await this.page.$$(".ytd-video-renderer");
         let firstVideo = null;
-        for (const selector of listSelector) {
+        for (const video of listVideos) {
           try {
-            firstVideo = await this.page.waitForSelector(selector, {
-              timeout: 10000,
-            });
-            if (firstVideo) {
-              break;
-            }
+            // find default overlay-style="DEFAULT"
+            await video.$('[overlay-style="DEFAULT"]');
+            firstVideo = await video.$("a#video-title");
+            break;
           } catch {
             continue;
           }
         }
         if (!firstVideo) {
-          throw new Error("No video results found for the keyword");
+          this.parent.sendMessage("automation-progress", {
+            message: `Worker ${this.workerId}: No valid video found in search results, using direct navigation`,
+          });
+          await this.navigateToTargetVideo(link.url);
+          return;
         }
         await firstVideo.click();
         await this.page.waitForLoadState("domcontentloaded");
-        await this.delay(5000);
+        for (let i = 0; i < 3; i++) {
+          await this.page.evaluate(() => {
+            window.scrollBy(0, window.innerHeight);
+          });
+          await this.delay(2000);
+        }
         const videoSelectors = ["yt-lockup-view-model a"];
         let replaceableVideo = null;
+
         for (const selector of videoSelectors) {
           try {
-            replaceableVideo = await this.page.waitForSelector(selector, {
-              timeout: 10000,
+            this.parent.sendMessage("automation-progress", {
+              message: `Worker ${this.workerId}: Waiting for ${selector} (max 2s)...`,
             });
+
+            replaceableVideo = await this.page.waitForSelector(selector, {
+              timeout: 2000,
+              state: "attached", // Element exists in DOM
+            });
+
             if (replaceableVideo) {
-              break;
+              // Verify nó có href hợp lệ không
+              const href = await replaceableVideo.getAttribute("href");
+              if (href && href.includes("watch")) {
+                this.parent.sendMessage("automation-progress", {
+                  message: `Worker ${this.workerId}: Found valid video with ${selector}`,
+                });
+                break;
+              } else {
+                replaceableVideo = null;
+                continue;
+              }
             }
-          } catch {
+          } catch (e) {
+            // Timeout hoặc error, thử selector tiếp theo
             continue;
           }
         }
@@ -576,6 +723,14 @@ class YouTubeWorker {
       // Step 1: Go to YouTube
       await this.page.goto("https://www.youtube.com/", {
         waitUntil: "domcontentloaded",
+      });
+
+      // Scroll to load videos
+      await this.page.evaluate(async () => {
+        for (let i = 0; i < 3; i++) {
+          window.scrollBy(0, window.innerHeight);
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
       });
       await this.delay(2000);
       const videoSelectors = [
@@ -606,17 +761,56 @@ class YouTubeWorker {
 
   async navigateToTargetVideo(targetUrl, replaceableVideo = null) {
     try {
-      this.parent.sendMessage("automation-progress", {
-        message: `Worker ${this.workerId}: Navigating to target video via replaceable element ${replaceableVideo ? "found" : "not found"}`,
-      });
+      // this.parent.sendMessage("automation-progress", {
+      //   message: `Worker ${this.workerId}: Navigating to target video via replaceable element ${replaceableVideo ? "found" : "not found"}`,
+      // });
       if (replaceableVideo) {
-        // Replace href of the replaceable video element
-        await replaceableVideo.evaluate((el, url) => {
-          el.href = url;
-        }, targetUrl);
+        try {
+          // const currentUrl = await replaceableVideo.getAttribute("href");
+          // this.parent.sendMessage("automation-progress", {
+          //   message: `Worker ${this.workerId}: Current replaceable video URL is ${currentUrl}`,
+          // });
 
-        await replaceableVideo.click();
+          const elementSelector = await replaceableVideo.evaluate((el) => {
+            if (el.id) return `#${el.id}`;
+            if (el.className) return `.${el.className.split(" ").join(".")}`;
+            return el.tagName.toLowerCase();
+          });
+
+          // Replace href thông qua page.evaluate
+          const success = await this.page.evaluate(
+            ({ elementSelector, targetUrl }) => {
+              const element = document.querySelector(elementSelector);
+              if (element?.href) {
+                document
+                  .querySelectorAll(`[href="${element.href}"]`)
+                  .forEach((el) => {
+                    el.href = targetUrl;
+                  });
+                element.href = targetUrl;
+                return true;
+              }
+              return false;
+            },
+            { elementSelector, targetUrl },
+          );
+
+          if (!success) {
+            throw new Error("Failed to update href");
+          }
+        } catch (e) {
+          this.parent.sendMessage("automation-progress", {
+            message: `Worker ${this.workerId}: Error replacing video link: ${e.message}, navigating directly`,
+          });
+          await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+        }
       } else {
+        await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+      }
+      try {
+        await this.page.click(`[href="${targetUrl}"]`);
+      } catch {
+        // Ignore
         await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
       }
       // Navigate directly to the target video

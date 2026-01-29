@@ -6,7 +6,7 @@ body {
 .log-container {
     max-height: 400px;
     overflow-y: auto;
-    background-color: #000;
+    background-color: #fff;
     color: #0f0;
     font-family: 'Courier New', monospace;
     font-size: 12px;

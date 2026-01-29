@@ -1,13 +1,35 @@
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
-const { spawn, fork } = require("child_process");
+const { fork } = require("child_process");
 const fs = require("fs-extra");
+
+function getResourcePath(relativePath) {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, relativePath);
+  }
+  return path.join(__dirname, relativePath);
+}
+
+function getAppResourcePath(relativePath) {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "app", relativePath);
+  }
+  return path.join(__dirname, relativePath);
+}
+
+function getConfigPath(filename) {
+  if (app.isPackaged) {
+    // Use userData directory for writable files in packaged app
+    return path.join(app.getPath("userData"), filename);
+  }
+  return path.join(__dirname, "../config", filename);
+}
 
 class ElectronApp {
   constructor() {
     this.mainWindow = null;
     this.workerProcess = null;
-    this.configPath = path.join(__dirname, "config.json");
+    this.configPath = getConfigPath("config.json");
     this.isRunning = false;
   }
 
@@ -49,12 +71,12 @@ class ElectronApp {
         contextIsolation: false,
         enableRemoteModule: true,
       },
-      icon: path.join(__dirname, "assets", "icon.png"),
+      icon: getAppResourcePath("assets/icon.png"),
       titleBarStyle: "default",
       show: false,
     });
 
-    this.mainWindow.loadFile("renderer/index.html");
+    this.mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
 
     this.mainWindow.once("ready-to-show", () => {
       this.mainWindow.show();
@@ -131,12 +153,10 @@ class ElectronApp {
       }
       try {
         this.isRunning = true;
-        this.workerProcess = fork(
-          path.join(__dirname, "youtube-worker.js"),
-          {
-            stdio: ["pipe", "pipe", "pipe", "ipc"],
-          },
-        );
+        let workerPath = getResourcePath("automation/youtube-worker.js");
+        this.workerProcess = fork(workerPath, [], {
+          stdio: ["pipe", "pipe", "pipe", "ipc"],
+        });
 
         this.workerProcess.on("message", (message) => {
           if (this.mainWindow) {
@@ -166,9 +186,9 @@ class ElectronApp {
         // this.workerProcess.stdout.on("data", (data) => {
         //   console.log(`[Worker stdout]: ${data}`);
         // });
-        // this.workerProcess.stderr.on("data", (data) => {
-        //   console.error(`[Worker stderr]: ${data}`);
-        // });
+        this.workerProcess.stderr.on("data", (data) => {
+          console.error(`[Worker stderr]: ${data}`);
+        });
         // console.log("Worker process started with PID:", this.workerProcess.pid);
 
         // Send configuration to worker

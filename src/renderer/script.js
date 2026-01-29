@@ -360,6 +360,8 @@ class YouTubeAutomationUI {
     }
 
     updateRunningState() {
+        console.log('Updating running state:', this.isRunning);
+        
         const startBtn = document.getElementById('startAutomation');
         const stopBtn = document.getElementById('stopAutomation');
 
