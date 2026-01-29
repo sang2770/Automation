@@ -751,11 +751,11 @@ class YouTubeWorker {
           continue;
         }
       }
-      if (!replaceableVideo) {
-        this.parent.sendMessage("automation-progress", {
-          message: `Worker ${this.workerId}: No replaceable video found on homepage, using direct navigation`,
-        });
-      }
+      // if (!replaceableVideo) {
+      //   this.parent.sendMessage("automation-progress", {
+      //     message: `Worker ${this.workerId}: No replaceable video found on homepage, using direct navigation`,
+      //   });
+      // }
       // Step 2: Navigate directly to target video
       await this.navigateToTargetVideo(link.url, replaceableVideo);
 
@@ -806,9 +806,9 @@ class YouTubeWorker {
             throw new Error("Failed to update href");
           }
         } catch (e) {
-          this.parent.sendMessage("automation-progress", {
-            message: `Worker ${this.workerId}: Error replacing video link: ${e.message}, navigating directly`,
-          });
+          // this.parent.sendMessage("automation-progress", {
+          //   message: `Worker ${this.workerId}: Error replacing video link: ${e.message}, navigating directly`,
+          // });
           await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
         } finally {
           try {
@@ -816,6 +816,10 @@ class YouTubeWorker {
           } catch {
             // Ignore
             await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+          } finally {
+            if (targetUrl !== this.page.url()) {
+              await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+            }
           }
         }
       } else {
