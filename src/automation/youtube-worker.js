@@ -350,7 +350,7 @@ class YouTubeWorker {
           headers: {
             "Content-Type": "application/json",
           },
-          timeout: 15000,
+          timeout: 60000,
         },
       );
 
@@ -440,7 +440,7 @@ class YouTubeWorker {
       baseUrl += `?win_size=${windowWidth},${windowHeight}`;
       baseUrl += `&win_pos=${windowX},${windowY}`;
 
-      const response = await axios.get(baseUrl, { timeout: 30000 });
+      const response = await axios.get(baseUrl, { timeout: 60000 });
 
       if (!response.data.success) {
         throw new Error(`Failed to start profile: ${response.data.message}`); f
