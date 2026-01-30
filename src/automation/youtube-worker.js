@@ -775,6 +775,12 @@ class YouTubeWorker {
         await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
       }
 
+      // Check current URL to ensure navigation
+      const currentUrl = this.page.url();
+      if (currentUrl !== targetUrl) {
+        await this.page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+      }
+
       /* ===============================
          WAIT VIDEO PLAYER (ADAPTIVE)
       ================================ */
