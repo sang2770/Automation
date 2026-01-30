@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const { fork } = require("child_process");
 const fs = require("fs-extra");
@@ -63,9 +63,6 @@ class ElectronApp {
   }
 
   async createMainWindow() {
-    // get key from gg sheet ID: 1YT0nc8frwsDiqbLHJStU0OTBvm5RSqQc2qyPNHV7wXU
-    const urlSvg =
-      "https://docs.google.com/spreadsheets/d/1YT0nc8frwsDiqbLHJStU0OTBvm5RSqQc2qyPNHV7wXU/export?format=csv";
     this.mainWindow = new BrowserWindow({
       width: 1400,
       height: 900,
@@ -243,6 +240,8 @@ class ElectronApp {
           views: 10,
           keywords: ["example", "video"],
           enabled: true,
+          adOption: "click", // 'click' or 'skip'
+          watchDuration: 30
         },
       ],
       profiles: [],

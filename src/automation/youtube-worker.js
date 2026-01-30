@@ -443,7 +443,8 @@ class YouTubeWorker {
       const response = await axios.get(baseUrl, { timeout: 120000 });
 
       if (!response.data.success) {
-        throw new Error(`Failed to start profile: ${response.data.message}`); f
+        throw new Error(`Failed to start profile: ${response.data.message}`);
+        f;
       }
 
       this.debugPort = response.data.data.remote_debugging_address;
@@ -588,11 +589,10 @@ class YouTubeWorker {
     }
   }
 
-  async smartWait(selector, {
-    timeout = 8000,
-    state = "visible",
-    fallbackDelay = 300
-  } = {}) {
+  async smartWait(
+    selector,
+    { timeout = 8000, state = "visible", fallbackDelay = 300 } = {},
+  ) {
     try {
       return await this.page.waitForSelector(selector, { timeout, state });
     } catch {
@@ -600,7 +600,6 @@ class YouTubeWorker {
       return null;
     }
   }
-
 
   async scrollUntil(selector, maxScroll = 5) {
     for (let i = 0; i < maxScroll; i++) {
@@ -629,7 +628,10 @@ class YouTubeWorker {
           link.keywords[Math.floor(Math.random() * link.keywords.length)];
         // #search-button-narrow
         try {
-          const searchButtonNarrow = await this.smartWait("#search-button-narrow", { timeout: 3000 });
+          const searchButtonNarrow = await this.smartWait(
+            "#search-button-narrow",
+            { timeout: 3000 },
+          );
           if (searchButtonNarrow) {
             await searchButtonNarrow.click();
           }
@@ -639,10 +641,9 @@ class YouTubeWorker {
         }
 
         // Find and click search box
-        const searchBox = await this.smartWait(
-          'input[name="search_query"]',
-          { timeout: 15000 }
-        );
+        const searchBox = await this.smartWait('input[name="search_query"]', {
+          timeout: 15000,
+        });
         await searchBox.click();
         await this.humanType(searchBox, randomKeyword);
 
@@ -652,7 +653,7 @@ class YouTubeWorker {
         await this.page.waitForLoadState("domcontentloaded");
         // Step 3: Click on first video result
         const firstVideo = await this.scrollUntil(
-          'ytd-video-renderer a#video-title[href*="watch"]'
+          'ytd-video-renderer a#video-title[href*="watch"]',
         );
         if (!firstVideo) {
           this.parent.sendMessage("automation-progress", {
@@ -666,7 +667,7 @@ class YouTubeWorker {
         await this.page.waitForLoadState("domcontentloaded");
 
         const relatedVideo = await this.scrollUntil(
-          'yt-lockup-view-model a[href*="watch"]'
+          'yt-lockup-view-model a[href*="watch"]',
         );
 
         if (!relatedVideo) {
@@ -682,7 +683,7 @@ class YouTubeWorker {
       }
 
       // Step 5: Wait for ads and click if enabled
-      await this.handleAds(settings);
+      await this.handleAds(link, settings);
     } catch (error) {
       throw new Error(`Method 1 failed: ${error.message}`);
     }
@@ -698,7 +699,7 @@ class YouTubeWorker {
         {
           waitUntil: "domcontentloaded",
           timeout: 60000,
-        }
+        },
       );
 
       /* ===============================
@@ -706,7 +707,7 @@ class YouTubeWorker {
       ================================ */
       const replaceableVideo = await this.scrollUntil(
         'ytd-video-renderer a#video-title[href*="watch"]',
-        5
+        5,
       );
 
       if (!replaceableVideo) {
@@ -723,13 +724,11 @@ class YouTubeWorker {
       /* ===============================
          STEP 4: HANDLE ADS
       ================================ */
-      await this.handleAds(settings);
-
+      await this.handleAds(link, settings);
     } catch (err) {
       throw new Error(`Method2 optimized failed: ${err.message}`);
     }
   }
-
 
   async navigateToTargetVideo(targetUrl, replaceableVideo = null) {
     try {
@@ -737,25 +736,27 @@ class YouTubeWorker {
          CASE 1: CÓ VIDEO CÓ THỂ REPLACE
       ================================ */
       if (replaceableVideo) {
-        const replaced = await this.page.evaluate(
-          ({ el, targetUrl }) => {
-            if (!el || !el.href) return false;
+        const replaced = await this.page
+          .evaluate(
+            ({ el, targetUrl }) => {
+              if (!el || !el.href) return false;
 
-            // Replace trực tiếp element hiện tại
-            el.href = targetUrl;
+              // Replace trực tiếp element hiện tại
+              el.href = targetUrl;
 
-            // Replace các link trùng href (YouTube hay clone node)
-            document
-              .querySelectorAll(`a[href="${el.href}"]`)
-              .forEach(a => (a.href = targetUrl));
+              // Replace các link trùng href (YouTube hay clone node)
+              document
+                .querySelectorAll(`a[href="${el.href}"]`)
+                .forEach((a) => (a.href = targetUrl));
 
-            return true;
-          },
-          {
-            el: replaceableVideo,
-            targetUrl,
-          }
-        ).catch(() => false);
+              return true;
+            },
+            {
+              el: replaceableVideo,
+              targetUrl,
+            },
+          )
+          .catch(() => false);
 
         // Click nếu replace OK
         if (replaced) {
@@ -784,25 +785,34 @@ class YouTubeWorker {
       /* ===============================
          WAIT VIDEO PLAYER (ADAPTIVE)
       ================================ */
-      await this.page.waitForSelector(
-        "#ytd-player, video",
-        { timeout: 15000 }
-      );
+      await this.page.waitForSelector("#ytd-player, video", { timeout: 15000 });
 
       this.parent.sendMessage("automation-progress", {
         message: `Worker ${this.workerId}: Navigated to target video`,
       });
-
     } catch (err) {
       throw new Error(`navigateToTargetVideo failed: ${err.message}`);
     }
   }
 
-
-  async handleAds(settings) {
+  async handleAds(link, settings) {
     try {
+      const adOption = link.adOption || "click"; // Default to click if not specified
+      // If no ads found but skip mode, still watch for the specified duration
+      if (adOption === "skip") {
+        const watchDuration = link.watchDuration;
+        // Use fixed duration (min value) instead of random
+        const fixedDuration = watchDuration * 1000;
+
+        this.parent.sendMessage("automation-progress", {
+          message: `Worker ${this.workerId}: Watching video for ${fixedDuration / 1000}s`,
+        });
+
+        await this.delay(fixedDuration);
+        return;
+      }
       this.parent.sendMessage("automation-progress", {
-        message: `Worker ${this.workerId}: Checking for ads...`,
+        message: `Worker ${this.workerId}: Checking for ads... (Mode: ${adOption})`,
       });
 
       // Wait for ad to appear (check multiple ad selectors based on provided structure)
@@ -850,7 +860,7 @@ class YouTubeWorker {
       }
 
       if (adFound) {
-        await this.clickOnAdView(adElement);
+          await this.clickOnAdView(adElement);
       } else if (!adFound) {
         this.parent.sendMessage("automation-progress", {
           message: `Worker ${this.workerId}: No ads detected within ${maxWaitTime}ms`,
