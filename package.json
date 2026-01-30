@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "build": "electron-builder",
+    "build-win": "electron-builder --win --publish=never",
     "pack": "electron-builder --dir"
   },
   "devDependencies": {
@@ -28,10 +28,36 @@
     "files": [
       "src/**/*",
       "node_modules/**/*",
-      "package.json"
+      "config/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules"
     ],
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Auto Google"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.exe"
     }
   }
 }
