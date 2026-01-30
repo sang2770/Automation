@@ -1,6 +1,7 @@
 const { chromium } = require("playwright");
 const { TOTP } = require("totp-generator");
 const path = require("path");
+const fs = require("fs");
 
 class WorkerProcess {
   constructor() {
