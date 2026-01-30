@@ -203,7 +203,7 @@ function isValidEmail_(email) {
       await fs.promises.rmdir(userDataDir, { recursive: true });
       this.sendMessage("info", `Cleaned up user data directory: ${userDataDir}`);
     } catch (error) {
-      this.sendMessage("error", `Failed to clean up user data directory: ${userDataDir}`);
+      this.sendMessage("warn", `Failed to clean up user data directory: ${userDataDir} - ${error.message}`);
       console.error(error);
     }
   }
@@ -228,7 +228,7 @@ function isValidEmail_(email) {
 
       const exeDir = path.dirname(process.execPath);
       const safeEmail = email.replace(/[^a-zA-Z0-9]/g, "_");
-      userDataDir = path.join(exeDir, `worker-${safeEmail}`);
+      userDataDir = path.join(exeDir, `worker-${safeEmail}_${Date.now()}`);
       // const userDataDir = path.join(
       //   __dirname,
       //   "..",
@@ -258,13 +258,17 @@ function isValidEmail_(email) {
       });
 
       // Enter email
-      await page.fill('input[type="email"]', email);
+      await page.fill('input[type="email"]', email, {
+        timeout: 30000,
+      });
       await this.delay(1000);
       await page.click("#identifierNext");
       await page.waitForTimeout(2000);
 
       // Enter password
-      await page.fill('input[type="password"]', password);
+      await page.fill('input[type="password"]', password, {
+        timeout: 30000,
+      });
       await this.delay(1000);
       await page.click("#passwordNext");
       await page.waitForTimeout(3000);
@@ -327,7 +331,7 @@ function isValidEmail_(email) {
 
       const [newPage] = await Promise.all([
         browser.waitForEvent("page"),
-        page.click('//*[text()="Apps Script"]'),
+        page.click('//*[text()="Apps Script"]', { timeout: 30000 }),
       ]);
 
       await newPage.waitForLoadState();
