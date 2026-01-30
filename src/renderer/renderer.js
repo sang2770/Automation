@@ -1,0 +1,888 @@
+class AutomationApp {
+    constructor() {
+        this.accounts = [];
+        this.data = { A: [], B: [], C: [], D: [] };
+        this.isRunning = false;
+        this.workers = [];
+        this.inputFormat = 'separated'; // 'separated' or 'combined'
+        
+        this.initializeElements();
+        this.setupEventListeners();
+        this.setupWorkerUpdateListener();
+        this.loadDefaultData();
+    }
+
+    initializeElements() {
+        // File import buttons
+        this.importAccountsBtn = document.getElementById('importAccountsBtn');
+        this.importDataBtn = document.getElementById('importDataBtn');
+        this.importCombinedBtn = document.getElementById('importCombinedBtn');
+        this.addAccountBtn = document.getElementById('addAccountBtn');
+        this.importAccountDataBtn = document.getElementById('importAccountDataBtn');
+        
+        // Input elements
+        this.accountsInput = document.getElementById('accountsInput');
+        this.combinedInput = document.getElementById('combinedInput');
+        this.columnAData = document.getElementById('columnAData');
+        this.columnBData = document.getElementById('columnBData');
+        this.columnCData = document.getElementById('columnCData');
+        this.columnDData = document.getElementById('columnDData');
+        this.fillDataFunction = document.getElementById('fillDataFunction');
+        this.autoGenerateBtn = document.getElementById('autoGenerateBtn');
+        this.previewFunctionBtn = document.getElementById('previewFunctionBtn');
+        this.clearFunctionBtn = document.getElementById('clearFunctionBtn');
+        this.functionStatus = document.getElementById('functionStatus');
+        this.functionPreview = document.getElementById('functionPreview');
+        this.previewCode = document.getElementById('previewCode');
+        this.useFunctionBtn = document.getElementById('useFunctionBtn');
+        this.cancelPreviewBtn = document.getElementById('cancelPreviewBtn');
+        this.concurrentWorkers = document.getElementById('concurrentWorkers');
+        
+        // Format sections
+        this.separatedFormat = document.getElementById('separatedFormat');
+        this.combinedFormat = document.getElementById('combinedFormat');
+        this.dataSection = document.getElementById('dataSection');
+        this.accountEditor = document.getElementById('accountEditor');
+        
+        // Account editor elements
+        this.accountSelect = document.getElementById('accountSelect');
+        this.accountDataForm = document.getElementById('accountDataForm');
+        this.editEmail = document.getElementById('editEmail');
+        this.editPassword = document.getElementById('editPassword');
+        this.editSecretKey = document.getElementById('editSecretKey');
+        this.editDataA = document.getElementById('editDataA');
+        this.editDataB = document.getElementById('editDataB');
+        this.editDataC = document.getElementById('editDataC');
+        this.editDataD = document.getElementById('editDataD');
+        this.saveAccountBtn = document.getElementById('saveAccountBtn');
+        this.cancelEditBtn = document.getElementById('cancelEditBtn');
+        this.deleteAccountBtn = document.getElementById('deleteAccountBtn');
+        
+        // Control buttons
+        this.startBtn = document.getElementById('startBtn');
+        this.stopBtn = document.getElementById('stopBtn');
+        this.statusBtn = document.getElementById('statusBtn');
+        
+        // Display elements
+        this.accountsCount = document.getElementById('accountsCount');
+        this.combinedCount = document.getElementById('combinedCount');
+        this.status = document.getElementById('status');
+        this.workersContainer = document.getElementById('workersContainer');
+        this.logsContainer = document.getElementById('logsContainer');
+        
+        // Format radio buttons
+        this.formatRadios = document.getElementsByName('inputFormat');
+        
+        // Current editing state
+        this.currentEditingAccountIndex = -1;
+        this.isCustomFunction = false;
+    }
+
+    setupEventListeners() {
+        // Format radio button handlers
+        this.formatRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => this.handleFormatChange(e.target.value));
+        });
+        
+        // File import handlers
+        this.importAccountsBtn.addEventListener('click', () => this.importAccountsFile());
+        this.importDataBtn.addEventListener('click', () => this.importDataFile());
+        this.importCombinedBtn.addEventListener('click', () => this.importCombinedFile());
+        this.importAccountDataBtn.addEventListener('click', () => this.importDataForSelectedAccount());
+        
+        // Account management handlers
+        this.addAccountBtn.addEventListener('click', () => this.addNewAccount());
+        this.accountSelect.addEventListener('change', () => this.handleAccountSelection());
+        this.saveAccountBtn.addEventListener('click', () => this.saveAccountData());
+        this.cancelEditBtn.addEventListener('click', () => this.cancelAccountEdit());
+        this.deleteAccountBtn.addEventListener('click', () => this.deleteSelectedAccount());
+        
+        // Fill Data Function handlers
+        this.autoGenerateBtn.addEventListener('click', () => this.autoGenerateFunction());
+        this.previewFunctionBtn.addEventListener('click', () => this.previewGeneratedFunction());
+        this.clearFunctionBtn.addEventListener('click', () => this.clearFunction());
+        this.useFunctionBtn.addEventListener('click', () => this.usePreviewedFunction());
+        this.cancelPreviewBtn.addEventListener('click', () => this.cancelPreview());
+        this.fillDataFunction.addEventListener('input', () => this.handleFunctionEdit());
+        
+        // Control handlers
+        this.startBtn.addEventListener('click', () => this.startAutomation());
+        this.stopBtn.addEventListener('click', () => this.stopAutomation());
+        this.statusBtn.addEventListener('click', () => this.checkStatus());
+        
+        // Input change handlers
+        this.accountsInput.addEventListener('input', () => this.parseAccounts());
+        this.combinedInput.addEventListener('input', () => this.parseCombinedInput());
+        this.columnAData.addEventListener('input', () => this.parseData());
+        this.columnBData.addEventListener('input', () => this.parseData());
+        this.columnCData.addEventListener('input', () => this.parseData());
+        this.columnDData.addEventListener('input', () => this.parseData());
+    }
+
+    setupWorkerUpdateListener() {
+        window.electronAPI.onWorkerUpdate((data) => {
+            this.handleWorkerUpdate(data);
+        });
+    }
+
+    loadDefaultData() {
+        // Load default data from the original main.js
+        const defaultDataA = [
+            "nattaponglum@gmail.com",
+            "sabulonss@gmail.com",
+            "rungtawan251988@gmail.com",
+            "suksomsap.sssc@gmail.com",
+            "fantasticchair9@gmail.com",
+            "kaws.condo@gmail.com",
+            "aujcharapom@gmail.com",
+            "beet999auto@gmail.com",
+            "preordershopchill@gmail.com",
+            "bokboondelivery@gmail.com"
+        ];
+
+        const defaultDataB = [
+            "บริษัท ไดว่า พร๊อพเพอร์ตี้ แอนด์ คอนสทรัคชั่น จำกัด",
+            "บริษัทกิตติศักดิ์การก่อสร้าง แอนด์ ดีไซน์ จำกัด",
+            "บริษัทรุ่งตะวันเพิ่มทรัพย์เกษตรอินทรีย์ไทยจำกัด",
+            "บริษัทสุขสมทรัพย์รับสร้างบ้านครบวงจร",
+            "บริษัทเก้าอี้มหัศจรรย์ตาแสวง จำกัด",
+            "บริหารขาย บ้าน คอนโด มือหนึ่ง และ  รีโนเวทใหม่-รับฝากขาย",
+            "บลูคริสตัลรีสอร์ทแหลมสิงห์ Blue Crystal Resort",
+            "บลูทูธสเตอริโอระดับเทพ",
+            "บอกต่อของถูก",
+            "บอกบุญ เดลิเวอรี่"
+        ];
+
+        const defaultDataC = [
+            "เรียน [Name], ขอแสดงความยินดีที่ได้รับป้ายสีน้ำเงิน!",
+            "เรียน [Name], ป้ายสีน้ำเงินของคุณเปิดใช้งานแล้ว!",
+            "เรียน [Name], ความสำเร็จได้รับการยืนยันแล้ว!",
+            "เรียน [Name], ขอแสดงความยินดีด้วย!",
+            "เรียน [Name], ป้ายสีน้ำเงินของคุณแสดงให้เห็นถึงความเป็นมืออาชีพ"
+        ];
+
+        const defaultDataD = [
+            "คลิกแบบฟอร์มนี้เพื่อรับ Blue Badge ของคุณทันที",
+            "แตะลิงก์นี้เพื่อเปิดใช้งาน Blue Badge ของคุณ",
+            "กรอกแบบฟอร์มนี้เพื่อรับ Blue Badge",
+            "คลิกที่นี่เพื่อรับ Blue Badge ของคุณ",
+            "ลงทะเบียนตอนนี้เพื่อรับ Blue Badge"
+        ];
+
+        this.columnAData.value = defaultDataA.join('\n');
+        this.columnBData.value = defaultDataB.join('\n');
+        this.columnCData.value = defaultDataC.join('\n');
+        this.columnDData.value = defaultDataD.join('\n');
+        
+        this.parseData();
+        
+        // Auto-generate function on initial load
+        setTimeout(() => {
+            this.autoGenerateFunction();
+        }, 500);
+    }
+
+    handleFormatChange(format) {
+        this.inputFormat = format;
+        
+        if (format === 'separated') {
+            this.separatedFormat.style.display = 'block';
+            this.combinedFormat.style.display = 'none';
+            this.dataSection.style.display = 'block';
+            this.parseAccounts();
+        } else {
+            this.separatedFormat.style.display = 'none';
+            this.combinedFormat.style.display = 'block';
+            this.dataSection.style.display = 'none';
+            this.parseCombinedInput();
+            this.updateAccountEditor();
+        }
+        
+        // Auto-regenerate function when format changes (unless it's custom)
+        if (!this.isCustomFunction) {
+            setTimeout(() => {
+                this.autoGenerateFunction();
+            }, 200);
+        }
+    }
+
+    updateAccountEditor() {
+        if (this.inputFormat === 'combined' && this.accounts.length > 0) {
+            this.accountEditor.style.display = 'block';
+            this.updateAccountSelect();
+        } else {
+            this.accountEditor.style.display = 'none';
+            this.accountDataForm.style.display = 'none';
+        }
+    }
+
+    updateAccountSelect() {
+        // Clear existing options
+        this.accountSelect.innerHTML = '<option value="">-- Choose an account --</option>';
+        
+        // Add options for each account
+        this.accounts.forEach((account, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = `${account.email} (Account ${index + 1})`;
+            this.accountSelect.appendChild(option);
+        });
+    }
+
+    addNewAccount() {
+        // Add empty account template
+        const newAccount = {
+            email: '',
+            password: '',
+            secretKey: '',
+            data: {
+                A: '',
+                B: '',
+                C: '',
+                D: ''
+            }
+        };
+        
+        this.accounts.push(newAccount);
+        this.updateCombinedTextarea();
+        this.updateAccountEditor();
+        
+        // Auto-select the new account for editing
+        this.accountSelect.value = this.accounts.length - 1;
+        this.handleAccountSelection();
+        
+        this.addLog(`➕ Added new empty account (Account ${this.accounts.length})`, 'info');
+    }
+
+    handleAccountSelection() {
+        const selectedIndex = parseInt(this.accountSelect.value);
+        
+        if (selectedIndex >= 0 && selectedIndex < this.accounts.length) {
+            this.currentEditingAccountIndex = selectedIndex;
+            this.loadAccountDataToForm(this.accounts[selectedIndex]);
+            this.accountDataForm.style.display = 'block';
+            this.deleteAccountBtn.disabled = false;
+        } else {
+            this.accountDataForm.style.display = 'none';
+            this.currentEditingAccountIndex = -1;
+            this.deleteAccountBtn.disabled = true;
+        }
+    }
+
+    loadAccountDataToForm(account) {
+        this.editEmail.value = account.email || '';
+        this.editPassword.value = account.password || '';
+        this.editSecretKey.value = account.secretKey || '';
+        this.editDataA.value = account.data?.A || '';
+        this.editDataB.value = account.data?.B || '';
+        this.editDataC.value = account.data?.C || '';
+        this.editDataD.value = account.data?.D || '';
+    }
+
+    saveAccountData() {
+        if (this.currentEditingAccountIndex < 0) {
+            this.addLog('❌ No account selected for editing', 'error');
+            return;
+        }
+
+        // Validate required fields
+        if (!this.editEmail.value.trim()) {
+            this.addLog('❌ Email is required', 'error');
+            this.editEmail.focus();
+            return;
+        }
+
+        if (!this.editPassword.value.trim()) {
+            this.addLog('❌ Password is required', 'error');
+            this.editPassword.focus();
+            return;
+        }
+
+        if (!this.editSecretKey.value.trim()) {
+            this.addLog('❌ Secret key is required', 'error');
+            this.editSecretKey.focus();
+            return;
+        }
+
+        // Update the account
+        const account = this.accounts[this.currentEditingAccountIndex];
+        account.email = this.editEmail.value.trim();
+        account.password = this.editPassword.value.trim();
+        account.secretKey = this.editSecretKey.value.trim();
+        account.data = {
+            A: this.editDataA.value.trim(),
+            B: this.editDataB.value.trim(),
+            C: this.editDataC.value.trim(),
+            D: this.editDataD.value.trim()
+        };
+
+        // Update UI
+        this.updateCombinedTextarea();
+        this.updateAccountSelect();
+        this.accountSelect.value = this.currentEditingAccountIndex; // Keep selection
+        
+        // Auto-regenerate function if not custom
+        if (!this.isCustomFunction) {
+            setTimeout(() => {
+                this.autoGenerateFunction();
+            }, 200);
+        }
+        
+        this.addLog(`💾 Saved data for account: ${account.email}`, 'success');
+    }
+
+    cancelAccountEdit() {
+        if (this.currentEditingAccountIndex >= 0) {
+            // Reload original data
+            this.loadAccountDataToForm(this.accounts[this.currentEditingAccountIndex]);
+        }
+        this.addLog('❌ Cancelled account edit', 'info');
+    }
+
+    deleteSelectedAccount() {
+        if (this.currentEditingAccountIndex < 0) {
+            this.addLog('❌ No account selected for deletion', 'error');
+            return;
+        }
+
+        const account = this.accounts[this.currentEditingAccountIndex];
+        const confirmDelete = confirm(`Are you sure you want to delete account: ${account.email}?`);
+        
+        if (confirmDelete) {
+            this.accounts.splice(this.currentEditingAccountIndex, 1);
+            this.updateCombinedTextarea();
+            this.updateAccountEditor();
+            this.accountDataForm.style.display = 'none';
+            this.currentEditingAccountIndex = -1;
+            
+            this.addLog(`🗑️ Deleted account: ${account.email}`, 'warning');
+        }
+    }
+
+    async importDataForSelectedAccount() {
+        if (this.currentEditingAccountIndex < 0) {
+            this.addLog('❌ No account selected', 'error');
+            return;
+        }
+
+        try {
+            const result = await window.electronAPI.importDataFile();
+            if (result.success) {
+                const lines = result.content.split('\n').filter(line => line.trim());
+                
+                if (lines.length > 0) {
+                    // Parse first line as CSV data
+                    const columns = lines[0].split(',').map(col => col.trim());
+                    
+                    // Update form fields
+                    this.editDataA.value = columns[0] || '';
+                    this.editDataB.value = columns[1] || '';
+                    this.editDataC.value = columns[2] || '';
+                    this.editDataD.value = columns[3] || '';
+                    
+                    this.addLog(`📁 Imported data for selected account from: ${result.filePath}`, 'success');
+                } else {
+                    this.addLog('❌ No data found in file', 'error');
+                }
+            } else {
+                this.addLog(`❌ Failed to import data: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            this.addLog(`❌ Error importing data: ${error.message}`, 'error');
+        }
+    }
+
+    updateCombinedTextarea() {
+        const lines = this.accounts.map(account => {
+            return [
+                account.email || '',
+                account.password || '',
+                account.secretKey || '',
+                account.data?.A || '',
+                account.data?.B || '',
+                account.data?.C || '',
+                account.data?.D || ''
+            ].join('|');
+        });
+        
+        this.combinedInput.value = lines.join('\n');
+        this.combinedCount.textContent = `${this.accounts.length} accounts with data loaded`;
+    }
+
+    // Fill Data Function Auto-Generation Methods
+    generateFillDataFunction() {
+        if (this.inputFormat === 'combined' && this.accounts.length > 0) {
+            return this.generateCombinedFormatFunction();
+        } else if (this.inputFormat === 'separated' && this.data) {
+            return this.generateSeparatedFormatFunction();
+        } else {
+            return this.generateDefaultFunction();
+        }
+    }
+
+    generateCombinedFormatFunction() {
+        // For combined format, create a function that uses account-specific data
+        const sampleAccount = this.accounts[0];
+        
+        return `
+function fillRandomData() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  
+  // Account-specific data for this execution
+  // This will be replaced by worker with actual account data
+  const A_Data = ["${sampleAccount?.data?.A || 'Sample Data A'}"];
+  const B_Data = ["${sampleAccount?.data?.B || 'Sample Data B'}"];
+  const C_Data = ["${sampleAccount?.data?.C || 'Sample Data C'}"];
+  const D_Data = ["${sampleAccount?.data?.D || 'Sample Data D'}"];
+  
+  const startRow = 2;
+  const numRows = Math.min(A_Data.length, B_Data.length, C_Data.length, D_Data.length);
+  
+  for (let i = 0; i < numRows; i++) {
+    sheet.getRange(startRow + i, 1).setValue(A_Data[i]);
+    sheet.getRange(startRow + i, 2).setValue(B_Data[i]);
+    sheet.getRange(startRow + i, 3).setValue(C_Data[i]);
+    sheet.getRange(startRow + i, 4).setValue(D_Data[i]);
+  }
+  
+  Logger.log("Data filled for combined format with account-specific data");
+}`;
+    }
+
+    generateSeparatedFormatFunction() {
+        // For separated format, create a function that uses shared data pool
+        return `
+function fillRandomData() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  
+  // Shared data pool for all accounts
+  const A_Data = ${JSON.stringify(this.data.A.slice(0, 10))};
+  const B_Data = ${JSON.stringify(this.data.B.slice(0, 10))};
+  const C_Data = ${JSON.stringify(this.data.C.slice(0, 10))};
+  const D_Data = ${JSON.stringify(this.data.D.slice(0, 10))};
+  
+  const startRow = 2;
+  const numRows = Math.min(A_Data.length, B_Data.length, C_Data.length, D_Data.length);
+  
+  for (let i = 0; i < numRows; i++) {
+    sheet.getRange(startRow + i, 1).setValue(A_Data[i]);
+    sheet.getRange(startRow + i, 2).setValue(B_Data[i]);
+    sheet.getRange(startRow + i, 3).setValue(C_Data[i]);
+    sheet.getRange(startRow + i, 4).setValue(D_Data[i]);
+  }
+  
+  Logger.log("Data filled for separated format with shared data pool");
+}`;
+    }
+
+    generateDefaultFunction() {
+        return `
+function fillRandomData() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  
+  // Default sample data
+  const A_Data = [
+    "sample1@example.com",
+    "sample2@example.com",
+    "sample3@example.com"
+  ];
+  const B_Data = [
+    "Sample Company 1",
+    "Sample Company 2", 
+    "Sample Company 3"
+  ];
+  const C_Data = [
+    "Dear [Name], sample message 1",
+    "Dear [Name], sample message 2",
+    "Dear [Name], sample message 3"
+  ];
+  const D_Data = [
+    "Click here for action 1",
+    "Click here for action 2",
+    "Click here for action 3"
+  ];
+  
+  const startRow = 2;
+  const numRows = Math.min(A_Data.length, B_Data.length, C_Data.length, D_Data.length);
+  
+  for (let i = 0; i < numRows; i++) {
+    sheet.getRange(startRow + i, 1).setValue(A_Data[i]);
+    sheet.getRange(startRow + i, 2).setValue(B_Data[i]);
+    sheet.getRange(startRow + i, 3).setValue(C_Data[i]);
+    sheet.getRange(startRow + i, 4).setValue(D_Data[i]);
+  }
+  
+  Logger.log("Default data filled");
+}`;
+    }
+
+    autoGenerateFunction() {
+        const generatedFunction = this.generateFillDataFunction();
+        this.fillDataFunction.value = generatedFunction;
+        this.fillDataFunction.className = 'auto-generated';
+        this.isCustomFunction = false;
+        this.updateFunctionStatus();
+        // this.addLog('🔄 Fill Data Function auto-generated successfully', 'success');
+    }
+
+    previewGeneratedFunction() {
+        const generatedFunction = this.generateFillDataFunction();
+        this.previewCode.textContent = generatedFunction;
+        this.functionPreview.style.display = 'flex';
+    }
+
+    clearFunction() {
+        this.fillDataFunction.value = '';
+        this.fillDataFunction.className = '';
+        this.isCustomFunction = false;
+        this.updateFunctionStatus();
+        this.addLog('🗑️ Fill Data Function cleared', 'info');
+    }
+
+    usePreviewedFunction() {
+        const previewedFunction = this.previewCode.textContent;
+        this.fillDataFunction.value = previewedFunction;
+        this.fillDataFunction.className = 'auto-generated';
+        this.isCustomFunction = false;
+        this.cancelPreview();
+        this.updateFunctionStatus();
+        this.addLog('✅ Generated function applied', 'success');
+    }
+
+    cancelPreview() {
+        this.functionPreview.style.display = 'none';
+    }
+
+    handleFunctionEdit() {
+        if (!this.isCustomFunction) {
+            this.fillDataFunction.className = 'custom-edited';
+            this.isCustomFunction = true;
+            this.updateFunctionStatus();
+        }
+    }
+
+    updateFunctionStatus() {
+        const hasFunction = this.fillDataFunction.value.trim().length > 0;
+        
+        if (!hasFunction) {
+            this.functionStatus.textContent = 'Function will be auto-generated based on your data';
+            this.functionStatus.className = 'function-status';
+        } else if (this.isCustomFunction) {
+            this.functionStatus.textContent = 'Custom function - manually edited';
+            this.functionStatus.className = 'function-status custom';
+        } else {
+            this.functionStatus.textContent = `Auto-generated function (${this.inputFormat} format)`;
+            this.functionStatus.className = 'function-status auto';
+        }
+    }
+
+    async importCombinedFile() {
+        try {
+            const result = await window.electronAPI.importAccountsFile();
+            if (result.success) {
+                this.combinedInput.value = result.content;
+                this.parseCombinedInput();
+                this.addLog(`📁 Imported combined data from: ${result.filePath}`, 'success');
+            } else {
+                this.addLog(`❌ Failed to import combined data: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            this.addLog(`❌ Error importing combined data: ${error.message}`, 'error');
+        }
+    }
+
+    parseCombinedInput() {
+        const text = this.combinedInput.value.trim();
+        if (!text) {
+            this.accounts = [];
+            this.combinedCount.textContent = '0 accounts with data loaded';
+            this.updateAccountEditor();
+            return;
+        }
+
+        const lines = text.split('\n').filter(line => line.trim());
+        this.accounts = [];
+
+        for (const line of lines) {
+            const parts = line.split('|').map(part => part.trim());
+            if (parts.length >= 7) { // email|password|secret|dataA|dataB|dataC|dataD
+                this.accounts.push({
+                    email: parts[0],
+                    password: parts[1],
+                    secretKey: parts[2],
+                    data: {
+                        A: parts[3] || '',
+                        B: parts[4] || '',
+                        C: parts[5] || '',
+                        D: parts[6] || ''
+                    }
+                });
+            } else if (parts.length >= 3) { // Fallback: just account info
+                this.accounts.push({
+                    email: parts[0],
+                    password: parts[1],
+                    secretKey: parts[2],
+                    data: {
+                        A: parts[3] || '',
+                        B: parts[4] || '',
+                        C: parts[5] || '',
+                        D: parts[6] || ''
+                    }
+                });
+            }
+        }
+
+        this.combinedCount.textContent = `${this.accounts.length} accounts with data loaded`;
+        this.updateAccountEditor();
+    }
+
+    async importAccountsFile() {
+        try {
+            const result = await window.electronAPI.importAccountsFile();
+            if (result.success) {
+                this.accountsInput.value = result.content;
+                this.parseAccounts();
+                this.addLog(`📁 Imported accounts from: ${result.filePath}`, 'success');
+            } else {
+                this.addLog(`❌ Failed to import accounts: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            this.addLog(`❌ Error importing accounts: ${error.message}`, 'error');
+        }
+    }
+
+    async importDataFile() {
+        try {
+            const result = await window.electronAPI.importDataFile();
+            if (result.success) {
+                // Parse CSV/text file content
+                const lines = result.content.split('\n').filter(line => line.trim());
+                
+                // Assume CSV format: A,B,C,D
+                const dataA = [], dataB = [], dataC = [], dataD = [];
+                
+                for (const line of lines) {
+                    const columns = line.split(',').map(col => col.trim());
+                    if (columns.length >= 4) {
+                        dataA.push(columns[0]);
+                        dataB.push(columns[1]);
+                        dataC.push(columns[2]);
+                        dataD.push(columns[3]);
+                    }
+                }
+                
+                this.columnAData.value = dataA.join('\n');
+                this.columnBData.value = dataB.join('\n');
+                this.columnCData.value = dataC.join('\n');
+                this.columnDData.value = dataD.join('\n');
+                
+                this.parseData();
+                this.addLog(`📁 Imported data from: ${result.filePath}`, 'success');
+            } else {
+                this.addLog(`❌ Failed to import data: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            this.addLog(`❌ Error importing data: ${error.message}`, 'error');
+        }
+    }
+
+    parseAccounts() {
+        const text = this.accountsInput.value.trim();
+        if (!text) {
+            this.accounts = [];
+            this.accountsCount.textContent = '0 accounts loaded';
+            return;
+        }
+
+        const lines = text.split('\n').filter(line => line.trim());
+        this.accounts = [];
+
+        for (const line of lines) {
+            const parts = line.split('|');
+            if (parts.length >= 3) {
+                this.accounts.push({
+                    email: parts[0].trim(),
+                    password: parts[1].trim(),
+                    secretKey: parts[2].trim(),
+                    data: null // Will use global data in separated format
+                });
+            }
+        }
+
+        this.accountsCount.textContent = `${this.accounts.length} accounts loaded`;
+    }
+
+    parseData() {
+        this.data.A = this.columnAData.value.split('\n').filter(line => line.trim());
+        this.data.B = this.columnBData.value.split('\n').filter(line => line.trim());
+        this.data.C = this.columnCData.value.split('\n').filter(line => line.trim());
+        this.data.D = this.columnDData.value.split('\n').filter(line => line.trim());
+        
+        // Auto-regenerate function if not custom and in separated format
+        if (!this.isCustomFunction && this.inputFormat === 'separated') {
+            setTimeout(() => {
+                this.autoGenerateFunction();
+            }, 300);
+        }
+    }
+
+    async startAutomation() {
+        if (this.isRunning) {
+            this.addLog('⚠️ Automation is already running', 'warning');
+            return;
+        }
+
+        if (this.accounts.length === 0) {
+            this.addLog('❌ No accounts loaded', 'error');
+            return;
+        }
+
+        const concurrent = parseInt(this.concurrentWorkers.value) || 2;
+        
+        this.isRunning = true;
+        this.startBtn.disabled = true;
+        this.stopBtn.disabled = false;
+        
+        this.updateStatus('🚀 Starting automation...', 'running');
+        this.addLog(`▶️ Starting automation with ${concurrent} workers for ${this.accounts.length} accounts (${this.inputFormat} format)`);
+
+        try {
+            // Auto-generate function if empty
+            let fillDataFunc = this.fillDataFunction.value.trim();
+            if (!fillDataFunc) {
+                fillDataFunc = this.generateFillDataFunction();
+                this.addLog('🔄 Using auto-generated Fill Data Function', 'info');
+            }
+            
+            const config = {
+                accounts: this.accounts,
+                data: this.inputFormat === 'separated' ? this.data : null, // Global data only for separated format
+                concurrent,
+                fillDataFunc,
+                inputFormat: this.inputFormat
+            };
+
+            const result = await window.electronAPI.startAutomation(config);
+            
+            if (result.success) {
+                this.addLog('✅ Automation completed successfully', 'success');
+                this.updateStatus('✅ Automation completed', 'completed');
+            } else {
+                this.addLog(`❌ Automation failed: ${result.error}`, 'error');
+                this.updateStatus('❌ Automation failed', 'error');
+            }
+            
+        } catch (error) {
+            this.addLog(`❌ Error starting automation: ${error.message}`, 'error');
+            this.updateStatus('❌ Error occurred', 'error');
+        } finally {
+            this.isRunning = false;
+            this.startBtn.disabled = false;
+            this.stopBtn.disabled = true;
+        }
+    }
+
+    async stopAutomation() {
+        try {
+            this.addLog('⏹️ Stopping all workers...');
+            const result = await window.electronAPI.stopAutomation();
+            
+            if (result.success) {
+                this.addLog('✅ All workers stopped', 'success');
+                this.updateStatus('⏹️ Stopped', 'stopped');
+            } else {
+                this.addLog(`❌ Failed to stop workers: ${result.error}`, 'error');
+            }
+            
+            this.isRunning = false;
+            this.startBtn.disabled = false;
+            this.stopBtn.disabled = true;
+            
+        } catch (error) {
+            this.addLog(`❌ Error stopping automation: ${error.message}`, 'error');
+        }
+    }
+
+    async checkStatus() {
+        try {
+            const result = await window.electronAPI.getWorkersStatus();
+            this.updateWorkersDisplay(result.workers);
+            this.addLog(`📊 Status checked - ${result.workers.length} workers found`);
+        } catch (error) {
+            this.addLog(`❌ Error checking status: ${error.message}`, 'error');
+        }
+    }
+
+    updateWorkersDisplay(workers) {
+        this.workersContainer.innerHTML = '';
+        
+        if (workers.length === 0) {
+            this.workersContainer.innerHTML = '<p>No active workers</p>';
+            return;
+        }
+
+        for (const worker of workers) {
+            const workerDiv = document.createElement('div');
+            workerDiv.className = `worker-item ${worker.status}`;
+            workerDiv.innerHTML = `
+                <div>
+                    <strong>Worker ${worker.id.substring(0, 8)}</strong>
+                    <br><small>PID: ${worker.pid}</small>
+                </div>
+                <span class="worker-status ${worker.status}">${worker.status}</span>
+            `;
+            this.workersContainer.appendChild(workerDiv);
+        }
+    }
+
+    handleWorkerUpdate(data) {
+        const { workerId, type, message, progress } = data;
+        const workerName = `Worker ${workerId.substring(0, 8)}`;
+        
+        switch (type) {
+            case 'progress':
+                this.addLog(`🔄 ${workerName}: ${message}`);
+                break;
+            case 'success':
+                this.addLog(`✅ ${workerName}: ${message}`, 'success');
+                break;
+            case 'error':
+                this.addLog(`❌ ${workerName}: ${message}`, 'error');
+                break;
+            case 'completed':
+                this.addLog(`🎉 ${workerName}: Completed`, 'success');
+                break;
+            default:
+                this.addLog(`📝 ${workerName}: ${message}`);
+        }
+
+        // Update status if needed
+        if (progress) {
+            this.updateStatus(`🔄 Processing... (${progress.current}/${progress.total})`, 'running');
+        }
+    }
+
+    updateStatus(message, type = 'info') {
+        this.status.innerHTML = `<p class="${type}">${message}</p>`;
+    }
+
+    addLog(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const logDiv = document.createElement('div');
+        logDiv.className = `log-item ${type}`;
+        logDiv.textContent = `[${timestamp}] ${message}`;
+        
+        this.logsContainer.appendChild(logDiv);
+        this.logsContainer.scrollTop = this.logsContainer.scrollHeight;
+        
+        // Keep only last 100 log entries
+        while (this.logsContainer.children.length > 100) {
+            this.logsContainer.removeChild(this.logsContainer.firstChild);
+        }
+    }
+}
+
+// Initialize app when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    new AutomationApp();
+});
