@@ -33,49 +33,6 @@ class ElectronApp {
     this.isRunning = false;
   }
 
-  async loadKeysFromSheet(sheetUrl) {
-    try {
-      const axios = require("axios");
-      console.log("Loading keys from Google Sheets...");
-
-      const response = await axios.get(sheetUrl, {
-        timeout: 10000,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
-      });
-      const sheetKeys = [];
-
-      if (response.data) {
-        // Parse CSV data
-        const csvData = response.data;
-        const lines = csvData.split("\n");
-
-        // Skip header row and parse data
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (line) {
-            const columns = line.split(",");
-            if (columns.length > 0) {
-              // Assuming first column contains the keys
-              const key = columns[0].replace(/"/g, "").trim();
-              if (key) {
-                sheetKeys.push(key);
-              }
-            }
-          }
-        }
-      } else {
-        console.error("No data received from Google Sheets");
-      }
-      return sheetKeys;
-    } catch (error) {
-      console.error("Error loading keys from Google Sheets:", error.message);
-      return [];
-    }
-  }
-
   async initialize() {
     // Ensure config file exists
     if (!(await fs.pathExists(this.configPath))) {
@@ -109,14 +66,6 @@ class ElectronApp {
     // get key from gg sheet ID: 1YT0nc8frwsDiqbLHJStU0OTBvm5RSqQc2qyPNHV7wXU
     const urlSvg =
       "https://docs.google.com/spreadsheets/d/1YT0nc8frwsDiqbLHJStU0OTBvm5RSqQc2qyPNHV7wXU/export?format=csv";
-
-    // Fetch key content from Google Sheets
-    const keys = await this.loadKeysFromSheet(urlSvg);
-    if (keys.length > 0 && keys.includes("abc")) { 
-      console.log('Key "abc" found in Google Sheets!');
-    }else {
-      return;
-    }
     this.mainWindow = new BrowserWindow({
       width: 1400,
       height: 900,
@@ -203,6 +152,7 @@ class ElectronApp {
     // Start automation
     ipcMain.handle("start-automation", async (event, config) => {
       if (this.isRunning) {
+        console.log("Automation is already running");
         return { success: false, error: "Automation is already running" };
       }
       try {
@@ -257,6 +207,12 @@ class ElectronApp {
 
     // Stop automation
     ipcMain.handle("stop-automation", async () => {
+      console.log(
+        "Received stop-automation request",
+        this.isRunning,
+        this.workerProcess,
+      );
+
       if (!this.isRunning || !this.workerProcess) {
         return { success: false, error: "No automation is running" };
       }
@@ -266,6 +222,9 @@ class ElectronApp {
         return { success: true };
       } catch (error) {
         return { success: false, error: error.message };
+      } finally {
+        this.isRunning = false;
+        this.workerProcess = null;
       }
     });
 
