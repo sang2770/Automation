@@ -212,6 +212,9 @@ function isValidEmail_(email) {
   async processAccount(account, accountIndex, totalAccounts) {
     const { email, password, secretKey } = account;
 
+    let browser = null;
+    let userDataDir = null;
+
     try {
       this.sendMessage(
         "progress",
@@ -225,7 +228,7 @@ function isValidEmail_(email) {
 
       const exeDir = path.dirname(process.execPath);
       const safeEmail = email.replace(/[^a-zA-Z0-9]/g, "_");
-      const userDataDir = path.join(exeDir, `worker-${safeEmail}`);
+      userDataDir = path.join(exeDir, `worker-${safeEmail}`);
       // const userDataDir = path.join(
       //   __dirname,
       //   "..",
@@ -234,14 +237,15 @@ function isValidEmail_(email) {
       // );
 
       // Launch browser with persistent context
-      const browser = await chromium.launchPersistentContext(userDataDir, {
+      browser = await chromium.launchPersistentContext(userDataDir, {
         headless: false, // Set to true for headless mode in production
         args: [
           "--disable-blink-features=AutomationControlled",
           "--disable-infobars",
         ],
         executablePath:
-          "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+          // "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
       });
 
       const page = await browser.newPage();
@@ -367,9 +371,19 @@ function isValidEmail_(email) {
       );
       return { success: false, account: email, error: error.message };
     } finally {
-            // Close browser
-      await browser.close();
-      await this.cleanupUserDataDir(userDataDir);
+      // Close browser if it was initialized
+      if (browser) {
+        try {
+          await browser.close();
+        } catch (closeError) {
+          this.sendMessage("error", `Error closing browser: ${closeError.message}`);
+        }
+      }
+
+      // Cleanup user data directory if it was created
+      if (userDataDir) {
+        await this.cleanupUserDataDir(userDataDir);
+      }
     }
   }
 
