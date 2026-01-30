@@ -198,6 +198,16 @@ function isValidEmail_(email) {
 `;
   }
 
+  async cleanupUserDataDir(userDataDir) {
+    try {
+      await fs.promises.rmdir(userDataDir, { recursive: true });
+      this.sendMessage("info", `Cleaned up user data directory: ${userDataDir}`);
+    } catch (error) {
+      this.sendMessage("error", `Failed to clean up user data directory: ${userDataDir}`);
+      console.error(error);
+    }
+  }
+
   // Process single account
   async processAccount(account, accountIndex, totalAccounts) {
     const { email, password, secretKey } = account;
@@ -213,12 +223,15 @@ function isValidEmail_(email) {
         },
       );
 
-      const userDataDir = path.join(
-        __dirname,
-        "..",
-        "user-data",
-        `worker-${email}`,
-      );
+      const exeDir = path.dirname(process.execPath);
+      const safeEmail = email.replace(/[^a-zA-Z0-9]/g, "_");
+      const userDataDir = path.join(exeDir, `worker-${safeEmail}`);
+      // const userDataDir = path.join(
+      //   __dirname,
+      //   "..",
+      //   "user-data",
+      //   `worker-${email}`,
+      // );
 
       // Launch browser with persistent context
       const browser = await chromium.launchPersistentContext(userDataDir, {
@@ -344,8 +357,7 @@ function isValidEmail_(email) {
 
       this.sendMessage("success", `Account ${email} processed successfully`);
 
-      // Close browser
-      await browser.close();
+
 
       return { success: true, account: email };
     } catch (error) {
@@ -354,6 +366,10 @@ function isValidEmail_(email) {
         `Error processing account ${email}: ${error.message}`,
       );
       return { success: false, account: email, error: error.message };
+    } finally {
+            // Close browser
+      await browser.close();
+      await this.cleanupUserDataDir(userDataDir);
     }
   }
 

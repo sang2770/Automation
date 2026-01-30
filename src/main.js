@@ -4,12 +4,21 @@ const { fork } = require("child_process");
 const fs = require("fs-extra");
 const { v4: uuidv4 } = require("uuid");
 
+
+function getConfigPath(filename) {
+  if (app.isPackaged) {
+    // Use userData directory for writable files in packaged app
+    return path.join(app.getPath("userData"), filename);
+  }
+  return path.join(__dirname, "../config", filename);
+}
+
 class ElectronApp {
   constructor() {
     this.mainWindow = null;
     this.workers = new Map(); // Lưu trữ các worker threads
     this.isDevMode = process.argv.includes("--dev");
-    this.configPath = path.join(__dirname, "..", "config", "config.json");
+    this.configPath = getConfigPath("config.json");
     this.config = null;
   }
 
@@ -188,8 +197,7 @@ class ElectronApp {
     // Bắt đầu automation với nhiều workers
     ipcMain.handle("start-automation", async (event, config) => {
       try {
-        const { accounts, data, concurrent, inputFormat } =
-          config;
+        const { accounts, data, concurrent, inputFormat } = config;
 
         // Save automation settings to config
         await this.updateConfig("automation", {
