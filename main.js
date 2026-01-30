@@ -226,295 +226,299 @@ function isValidEmail_(email) {
   const delay = (ms) => new Promise((res) => setTimeout(res, ms));
   try {
     console.log("🚀 Starting Google Sheets automation...");
-    // Go to Google login
-    await page.goto("https://accounts.google.com/signin", {
+    await page.goto("https://myaccount.google.com/", {
       waitUntil: "domcontentloaded",
     });
-    console.log("📧 Entering email...");
-    await page.fill('input[type="email"]', email);
-    await delay(1000);
-    await page.click("#identifierNext");
-    await page.waitForTimeout(2000);
-
-    // Enter password
-    console.log("🔐 Entering password...");
-    await page.fill('input[type="password"]', password);
-    await delay(1000);
-    await page.click("#passwordNext");
-    await page.waitForTimeout(3000);
-
-    // Handle 2FA if required
-    if (
-      await page
-        .locator('input[type="tel"], input[aria-label*="code"]')
-        .isVisible()
-    ) {
-      console.log("🔒 Handling 2FA...");
-      const code = await get2FACode(secretKey);
-      console.log(`Generated 2FA code: ${code}`);
-
-      // Enter 2FA code
-      await page.fill('input[type="tel"], input[placeholder*="code"]', code);
-      await delay(1000);
-
-      // Click "Next" after entering the 2FA code
-      const nextButtonSelector = '#totpNext, button[type="submit"]';
-      if (await page.locator(nextButtonSelector).isVisible()) {
-        await page.click(nextButtonSelector);
-        console.log("🔐 2FA code entered successfully!");
-      } else {
-        console.log(
-          "⚠️ 'Next' button after 2FA not found. Please check manually.",
-        );
-      }
-    }
-
-    // // check is have text Not now or Skip
-    if (
-      await page
-        .locator('button:has-text("Not now"), button:has-text("Skip")')
-        .isVisible()
-    ) {
-      console.log("⏭️ Handling 'Not now' or 'Skip'...");
-      await page
-        .locator('button:has-text("Not now"), button:has-text("Skip")')
-        .click();
-      await delay(2000);
-    }
-
-    // // Wait for Google Sheets to load
-    console.log("📊 Navigating to Google Sheets...");
-    // await page.evaluate(() => {
-    //   document.querySelector('[aria-label="change profile picture"]').click();
-    //   document.querySelector('[aria-label="Upload from Device"]').click();
-    // });
-    await delay(10000);
-    await page.goto("https://docs.google.com/spreadsheets");
-    await delay(2000);
-
-    // Redirect to new sheet creation
-    console.log("📝 Creating new sheet...");
-    await page.goto("https://docs.google.com/spreadsheets/create");
-    console.log("✅ New Google Sheet created successfully!");
-    await page.goto(
-      "https://myaccount.google.com/?hl=en&utm_source=OGB&utm_medium=act&gar=WzJd",
-    );
-    // change avatar
-
     await page.goto(
       "https://docs.google.com/spreadsheets/d/1mVQ44j5Q0ecnrXIglQ4QxtV3eJHSZQpRFSRQI1VgvTo/edit?gid=0#gid=0",
     );
-    // Open Apps Script from menu
-    console.log("🔧 Opening Apps Script...");
-    try {
-      const extensionsMenuSelector = "#docs-extensions-menu";
-      await page.waitForSelector(extensionsMenuSelector, { timeout: 5000 }); // Wait for the Extensions menu to appear
-      await page.click(extensionsMenuSelector);
-      await delay(2000);
 
-      const appsScriptOptionSelector = '//*[text()="Apps Script"]';
-      const [newPage] = await Promise.all([
-        browser.waitForEvent("page"), // Đợi tab mới được mở
-        page.click(appsScriptOptionSelector), // Thực hiện click vào nút mở tab mới
-      ]);
+    // // Go to Google login
+    // await page.goto("https://accounts.google.com/signin", {
+    //   waitUntil: "domcontentloaded",
+    // });
+    // console.log("📧 Entering email...");
+    // await page.fill('input[type="email"]', email);
+    // await delay(1000);
+    // await page.click("#identifierNext");
+    // await page.waitForTimeout(2000);
 
-      console.log("Tab mới đã được mở!");
+    // // Enter password
+    // console.log("🔐 Entering password...");
+    // await page.fill('input[type="password"]', password);
+    // await delay(1000);
+    // await page.click("#passwordNext");
+    // await page.waitForTimeout(3000);
 
-      // Chuyển sang tab mới
-      await newPage.waitForLoadState(); // Chờ tab mới tải hoàn tất
-      await delay(5000);
-      console.log("URL của tab mới:", newPage.url());
-      const execute_functions = async (page, funcNames) => {
-        await page.evaluate(async (perrmissionRequiredFuncString) => {
-          await new Promise((resolve) => {
-            if (window.monaco && window.monaco.editor) {
-              resolve();
-            } else {
-              const checkMonaco = setInterval(() => {
-                if (window.monaco && window.monaco.editor) {
-                  clearInterval(checkMonaco);
-                  resolve();
-                }
-              }, 100);
-            }
-          });
+    // // Handle 2FA if required
+    // if (
+    //   await page
+    //     .locator('input[type="tel"], input[aria-label*="code"]')
+    //     .isVisible()
+    // ) {
+    //   console.log("🔒 Handling 2FA...");
+    //   const code = await get2FACode(secretKey);
+    //   console.log(`Generated 2FA code: ${code}`);
 
-          const monacoEditor = window.monaco.editor.getModels()[0]; // Lấy model đầu tiên của Monaco Editor
-          monacoEditor.setValue(perrmissionRequiredFuncString);
-        }, funcNames);
+    //   // Enter 2FA code
+    //   await page.fill('input[type="tel"], input[placeholder*="code"]', code);
+    //   await delay(1000);
 
-        //   Ctrl + S to save the script
-        await page.keyboard.down("Control");
-        await page.keyboard.press("KeyS");
-        await page.keyboard.up("Control");
-        console.log("Script saved.");
+    //   // Click "Next" after entering the 2FA code
+    //   const nextButtonSelector = '#totpNext, button[type="submit"]';
+    //   if (await page.locator(nextButtonSelector).isVisible()) {
+    //     await page.click(nextButtonSelector);
+    //     console.log("🔐 2FA code entered successfully!");
+    //   } else {
+    //     console.log(
+    //       "⚠️ 'Next' button after 2FA not found. Please check manually.",
+    //     );
+    //   }
+    // }
 
-        await delay(5000);
-        // Ctrl + R
-        await page.keyboard.press("Control+KeyR");
-        await page.keyboard.up("Control");
-        console.log("Script reloaded.");
-      };
-      await execute_functions(newPage, perrmissionRequiredFuncString);
-      console.log("✅ Permission function script set.");
+    // // // check is have text Not now or Skip
+    // if (
+    //   await page
+    //     .locator('button:has-text("Not now"), button:has-text("Skip")')
+    //     .isVisible()
+    // ) {
+    //   console.log("⏭️ Handling 'Not now' or 'Skip'...");
+    //   await page
+    //     .locator('button:has-text("Not now"), button:has-text("Skip")')
+    //     .click();
+    //   await delay(2000);
+    // }
 
-      await delay(5000);
-      try {
-        await newPage.evaluate(async () => {
-          document
-            .querySelector("[role='dialog']")
-            .querySelectorAll("button")[1]
-            .click();
-        });
+    // // // Wait for Google Sheets to load
+    // console.log("📊 Navigating to Google Sheets...");
 
-        // click text Review permissions
-        const [reviewPermissionsPage] = await Promise.all([
-          browser.waitForEvent("page"), // Lắng nghe tab mới/chờ cửa sổ bật lên
-          newPage.waitForTimeout(2000),
-        ]);
+    // await delay(10000);
+    // await page.goto("https://docs.google.com/spreadsheets");
+    // await delay(2000);
 
-        console.log("🚀 Cửa sổ cấp quyền đã được mở.");
+    // // Redirect to new sheet creation
+    // console.log("📝 Creating new sheet...");
+    // await page.goto("https://docs.google.com/spreadsheets/create");
+    // console.log("✅ New Google Sheet created successfully!");
+    // await page.goto(
+    //   "https://myaccount.google.com/?hl=en&utm_source=OGB&utm_medium=act&gar=WzJd",
+    // );
+    // // change avatar
 
-        // Đợi tab được load hoàn tất và chuyển sang tab mới
-        await reviewPermissionsPage.waitForLoadState();
-        console.log(`Tab mới URL: ${reviewPermissionsPage.url()}`);
+    // await page.goto(
+    //   "https://docs.google.com/spreadsheets/d/1mVQ44j5Q0ecnrXIglQ4QxtV3eJHSZQpRFSRQI1VgvTo/edit?gid=0#gid=0",
+    // );
+    // // Open Apps Script from menu
+    // console.log("🔧 Opening Apps Script...");
+    // try {
+    //   const extensionsMenuSelector = "#docs-extensions-menu";
+    //   await page.waitForSelector(extensionsMenuSelector, { timeout: 5000 }); // Wait for the Extensions menu to appear
+    //   await page.click(extensionsMenuSelector);
+    //   await delay(2000);
 
-        console.log("🔑 Đang xử lý nhập OTP...");
-        try {
-          const otpCode = await get2FACode(secretKey);
-          await reviewPermissionsPage.fill(
-            'input[type="tel"], input[aria-label*="code"]',
-            otpCode,
-          );
-          await delay(1000);
-          await reviewPermissionsPage.click('#totpNext, button[type="submit"]');
-          console.log("✅ OTP đã được nhập thành công.");
-        } catch (error) {
-          console.log(
-            "⚠️ Không cần nhập OTP hoặc có lỗi xảy ra: " + error.message,
-          );
-        }
+    //   const appsScriptOptionSelector = '//*[text()="Apps Script"]';
+    //   const [newPage] = await Promise.all([
+    //     browser.waitForEvent("page"), // Đợi tab mới được mở
+    //     page.click(appsScriptOptionSelector), // Thực hiện click vào nút mở tab mới
+    //   ]);
 
-        // Click "Advanced / Nâng cao"
-        await reviewPermissionsPage
-          .locator('a:has-text("Advanced")')
-          .click({ timeout: 10000 });
+    //   console.log("Tab mới đã được mở!");
 
-        console.log("✅ Đã nhấp vào nút Nâng cao/Advanced.");
+    //   // Chuyển sang tab mới
+    //   await newPage.waitForLoadState(); // Chờ tab mới tải hoàn tất
+    //   await delay(5000);
+    //   console.log("URL của tab mới:", newPage.url());
+    //   const execute_functions = async (page, funcNames) => {
+    //     await page.evaluate(async (perrmissionRequiredFuncString) => {
+    //       await new Promise((resolve) => {
+    //         if (window.monaco && window.monaco.editor) {
+    //           resolve();
+    //         } else {
+    //           const checkMonaco = setInterval(() => {
+    //             if (window.monaco && window.monaco.editor) {
+    //               clearInterval(checkMonaco);
+    //               resolve();
+    //             }
+    //           }, 100);
+    //         }
+    //       });
 
-        // Click "Go to Untitled project (unsafe)"
-        await reviewPermissionsPage
-          .locator("text=Go to Untitled project (unsafe)")
-          .click({ timeout: 10000 });
+    //       const monacoEditor = window.monaco.editor.getModels()[0]; // Lấy model đầu tiên của Monaco Editor
+    //       monacoEditor.setValue(perrmissionRequiredFuncString);
+    //     }, funcNames);
 
-        console.log("✅ Đã nhấp vào nút không an toàn/Not Safe.");
+    //     //   Ctrl + S to save the script
+    //     await page.keyboard.down("Control");
+    //     await page.keyboard.press("KeyS");
+    //     await page.keyboard.up("Control");
+    //     console.log("Script saved.");
 
-        // Click "Continue"
-        await reviewPermissionsPage
-          .locator('button:has-text("Continue")')
-          .click({ timeout: 10000 });
+    //     await delay(5000);
+    //     // Ctrl + R
+    //     await page.keyboard.press("Control+KeyR");
+    //     await page.keyboard.up("Control");
+    //     console.log("Script reloaded.");
+    //   };
+    //   await execute_functions(newPage, perrmissionRequiredFuncString);
+    //   console.log("✅ Permission function script set.");
 
-        console.log("✅ Đã nhấp vào nút Tiếp tục/Continue.");
+    //   await delay(5000);
+    //   try {
+    //     await newPage.evaluate(async () => {
+    //       document
+    //         .querySelector("[role='dialog']")
+    //         .querySelectorAll("button")[1]
+    //         .click();
+    //     });
 
-        // Select all permissions
-        try {
-          await reviewPermissionsPage
-            .locator("text=Select all")
-            .click({ timeout: 10000 });
-        } catch (error) {
-          console.log("⚠️ Không tìm thấy nút 'Select all': " + error.message);
-          await reviewPermissionsPage.evaluate(() => {
-            // Chọn tất cả các quyền theo cách thủ công
-            const checkboxes = document.querySelectorAll(
-              'input[type="checkbox"]',
-            );
-            checkboxes.forEach((checkbox) => {
-              if (!checkbox.checked) {
-                checkbox.click();
-              }
-            });
-          });
-        }
+    //     // click text Review permissions
+    //     const [reviewPermissionsPage] = await Promise.all([
+    //       browser.waitForEvent("page"), // Lắng nghe tab mới/chờ cửa sổ bật lên
+    //       newPage.waitForTimeout(2000),
+    //     ]);
 
-        // Click Continue lần 2
-        try {
-          await reviewPermissionsPage
-            .locator('button:has-text("Continue")')
-            .click({ timeout: 10000 });
-        } catch (error) {
-          console.log("⚠️ Không tìm thấy nút 'Continue': " + error.message);
-        }
-      } catch (error) {
-        console.log("⚠️ Đã xảy ra lỗi: " + error.message);
-      }
+    //     console.log("🚀 Cửa sổ cấp quyền đã được mở.");
 
-      // Chờ script chạy xong
-      await newPage.waitForSelector('div:has-text("Execution completed")', {
-        timeout: 60000,
-      });
+    //     // Đợi tab được load hoàn tất và chuyển sang tab mới
+    //     await reviewPermissionsPage.waitForLoadState();
+    //     console.log(`Tab mới URL: ${reviewPermissionsPage.url()}`);
 
-      console.log("✅ Script executed successfully!");
+    //     console.log("🔑 Đang xử lý nhập OTP...");
+    //     try {
+    //       const otpCode = await get2FACode(secretKey);
+    //       await reviewPermissionsPage.fill(
+    //         'input[type="tel"], input[aria-label*="code"]',
+    //         otpCode,
+    //       );
+    //       await delay(1000);
+    //       await reviewPermissionsPage.click('#totpNext, button[type="submit"]');
+    //       console.log("✅ OTP đã được nhập thành công.");
+    //     } catch (error) {
+    //       console.log(
+    //         "⚠️ Không cần nhập OTP hoặc có lỗi xảy ra: " + error.message,
+    //       );
+    //     }
 
-      await execute_functions(newPage, fillDataFuncString);
-      console.log("✅ Fill data function script set.");
+    //     // Click "Advanced / Nâng cao"
+    //     await reviewPermissionsPage
+    //       .locator('a:has-text("Advanced")')
+    //       .click({ timeout: 10000 });
 
-      await delay(5000);
+    //     console.log("✅ Đã nhấp vào nút Nâng cao/Advanced.");
 
-      await execute_functions(newPage, sendEmailsFuncString);
-      const reRun = async () => {
-        // Ctrl + R
-        await newPage.keyboard.press("Control+KeyR");
-        await newPage.keyboard.up("Control");
-        console.log("Script reloaded for re-run.");
-      };
-      let intervalId = setInterval(async () => {
-        // Check aria-label="Exceeded maximum execution time."
-        const result = await newPage.evaluate(() => {
-          const itemList = document.querySelectorAll('[role="listitem"]');
-          if (itemList.length > 0) {
-            const lastItem = itemList[itemList.length - 1];
-            const texts = lastItem.querySelectorAll("div");
-            const errorDiv = Array.from(texts).find((div) =>
-              div.textContent.includes("Exceeded maximum execution time."),
-            );
-            console.log("Checking for timeout or success...", errorDiv);
+    //     // Click "Go to Untitled project (unsafe)"
+    //     await reviewPermissionsPage
+    //       .locator("text=Go to Untitled project (unsafe)")
+    //       .click({ timeout: 10000 });
 
-            if (errorDiv) {
-              return { timeout: true };
-            }
-            const success = Array.from(texts).find((div) =>
-              div.textContent.includes("Execution completed"),
-            );
-            console.log("Checking for success...", success);
+    //     console.log("✅ Đã nhấp vào nút không an toàn/Not Safe.");
 
-            if (success) {
-              return { success: true };
-            }
-          }
+    //     // Click "Continue"
+    //     await reviewPermissionsPage
+    //       .locator('button:has-text("Continue")')
+    //       .click({ timeout: 10000 });
 
-          return {};
-        });
-        console.log("Interval check result:", result);
+    //     console.log("✅ Đã nhấp vào nút Tiếp tục/Continue.");
 
-        if (result.timeout) {
-          console.log("⏰ Detected timeout. Re-running the script...");
-          await reRun();
-        } else if (result.success) {
-          console.log("✅ Detected successful execution.");
-          clearInterval(intervalId);
-          intervalId = null;
-        }
-      }, 5000);
-      console.log("✅ Send emails function script set.");
-      console.log("🎉 Successfully opened Apps Script!");
-    } catch (error) {
-      console.log(
-        "⚠️ Failed to open Apps Script menu. Proceeding anyway..." +
-          error.message,
-      );
-    }
+    //     // Select all permissions
+    //     try {
+    //       await reviewPermissionsPage
+    //         .locator("text=Select all")
+    //         .click({ timeout: 10000 });
+    //     } catch (error) {
+    //       console.log("⚠️ Không tìm thấy nút 'Select all': " + error.message);
+    //       await reviewPermissionsPage.evaluate(() => {
+    //         // Chọn tất cả các quyền theo cách thủ công
+    //         const checkboxes = document.querySelectorAll(
+    //           'input[type="checkbox"]',
+    //         );
+    //         checkboxes.forEach((checkbox) => {
+    //           if (!checkbox.checked) {
+    //             checkbox.click();
+    //           }
+    //         });
+    //       });
+    //     }
 
-    await page.waitForTimeout(5000); // Pause for manual inspection (optional)
+    //     // Click Continue lần 2
+    //     try {
+    //       await reviewPermissionsPage
+    //         .locator('button:has-text("Continue")')
+    //         .click({ timeout: 10000 });
+    //     } catch (error) {
+    //       console.log("⚠️ Không tìm thấy nút 'Continue': " + error.message);
+    //     }
+    //   } catch (error) {
+    //     console.log("⚠️ Đã xảy ra lỗi: " + error.message);
+    //   }
+
+    //   // Chờ script chạy xong
+    //   await newPage.waitForSelector('div:has-text("Execution completed")', {
+    //     timeout: 60000,
+    //   });
+
+    //   console.log("✅ Script executed successfully!");
+
+    //   await execute_functions(newPage, fillDataFuncString);
+    //   console.log("✅ Fill data function script set.");
+
+    //   await delay(5000);
+
+    //   await execute_functions(newPage, sendEmailsFuncString);
+    //   const reRun = async () => {
+    //     // Ctrl + R
+    //     await newPage.keyboard.press("Control+KeyR");
+    //     await newPage.keyboard.up("Control");
+    //     console.log("Script reloaded for re-run.");
+    //   };
+    //   let intervalId = setInterval(async () => {
+    //     // Check aria-label="Exceeded maximum execution time."
+    //     const result = await newPage.evaluate(() => {
+    //       const itemList = document.querySelectorAll('[role="listitem"]');
+    //       if (itemList.length > 0) {
+    //         const lastItem = itemList[itemList.length - 1];
+    //         const texts = lastItem.querySelectorAll("div");
+    //         const errorDiv = Array.from(texts).find((div) =>
+    //           div.textContent.includes("Exceeded maximum execution time."),
+    //         );
+    //         console.log("Checking for timeout or success...", errorDiv);
+
+    //         if (errorDiv) {
+    //           return { timeout: true };
+    //         }
+    //         const success = Array.from(texts).find((div) =>
+    //           div.textContent.includes("Execution completed"),
+    //         );
+    //         console.log("Checking for success...", success);
+
+    //         if (success) {
+    //           return { success: true };
+    //         }
+    //       }
+
+    //       return {};
+    //     });
+    //     console.log("Interval check result:", result);
+
+    //     if (result.timeout) {
+    //       console.log("⏰ Detected timeout. Re-running the script...");
+    //       await reRun();
+    //     } else if (result.success) {
+    //       console.log("✅ Detected successful execution.");
+    //       clearInterval(intervalId);
+    //       intervalId = null;
+    //     }
+    //   }, 5000);
+    //   console.log("✅ Send emails function script set.");
+    //   console.log("🎉 Successfully opened Apps Script!");
+    // } catch (error) {
+    //   console.log(
+    //     "⚠️ Failed to open Apps Script menu. Proceeding anyway..." +
+    //       error.message,
+    //   );
+    // }
+
+    // await page.waitForTimeout(5000); // Pause for manual inspection (optional)
   } catch (error) {
     console.error(`❌ An error occurred: ${error.message}`);
   } finally {

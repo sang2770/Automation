@@ -626,22 +626,6 @@ small {
     border-top: 1px solid #dee2e6;
 }
 
-#fillDataFunction {
-    font-family: 'Courier New', monospace;
-    font-size: 0.9em;
-    line-height: 1.4;
-}
-
-#fillDataFunction.auto-generated {
-    background-color: #f0f8ff;
-    border-color: #2196f3;
-}
-
-#fillDataFunction.custom-edited {
-    background-color: #fff8e1;
-    border-color: #ff9800;
-}
-
 /* Responsive */
 @media (max-width: 1200px) {
     .main-content {

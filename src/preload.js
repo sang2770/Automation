@@ -3,6 +3,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Config functions
+  getConfig: () => ipcRenderer.invoke('get-config'),
+  updateConfig: (section, data) => ipcRenderer.invoke('update-config', section, data),
+  saveConfig: () => ipcRenderer.invoke('save-config'),
+  
   // File import functions
   importAccountsFile: () => ipcRenderer.invoke('import-accounts-file'),
   importDataFile: () => ipcRenderer.invoke('import-data-file'),

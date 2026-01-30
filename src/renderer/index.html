@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Công cụ Tự động hóa - Đa luồng Playwright</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -17,28 +19,29 @@
             <!-- Configuration Panel -->
             <div class="panel">
                 <h2>📋 Cấu hình</h2>
-                
+
                 <!-- Accounts Import -->
                 <div class="section">
                     <h3>Tài khoản Google & Dữ liệu</h3>
                     <div class="input-format-options">
                         <label>
-                            <input type="radio" name="inputFormat" value="separated" checked> 
+                            <input type="radio" name="inputFormat" value="separated" checked>
                             Nhập riêng biệt (tài khoản & dữ liệu tách rời)
                         </label>
                         <label>
-                            <input type="radio" name="inputFormat" value="combined"> 
+                            <input type="radio" name="inputFormat" value="combined">
                             Nhập kết hợp (mỗi tài khoản có dữ liệu riêng)
                         </label>
                     </div>
-                    
+
                     <!-- Separated Format -->
                     <div id="separatedFormat" class="format-section">
                         <p><strong>Định dạng Tài khoản:</strong> email|mật_khẩu|khóa_bí_mật (mỗi dòng một tài khoản)</p>
                         <button id="importAccountsBtn" class="btn btn-secondary">
                             📁 Nhập File Tài khoản
                         </button>
-                        <textarea id="accountsInput" placeholder="email1|password1|secret1&#10;email2|password2|secret2"></textarea>
+                        <textarea id="accountsInput"
+                            placeholder="email1|password1|secret1&#10;email2|password2|secret2"></textarea>
                         <div class="info">
                             <span id="accountsCount">0 tài khoản đã tải</span>
                         </div>
@@ -46,16 +49,19 @@
 
                     <!-- Combined Format -->
                     <div id="combinedFormat" class="format-section" style="display: none;">
-                        <p><strong>Định dạng Kết hợp:</strong> email|mật_khẩu|khóa_bí_mật|dữ_liệu_A|dữ_liệu_B|dữ_liệu_C|dữ_liệu_D (mỗi dòng một tài khoản)</p>
+                        <p><strong>Định dạng Kết hợp:</strong>
+                            email|mật_khẩu|khóa_bí_mật|dữ_liệu_A|dữ_liệu_B|dữ_liệu_C|dữ_liệu_D (mỗi dòng một tài khoản)
+                        </p>
                         <div class="combined-controls">
-                            <button id="importCombinedBtn" class="btn btn-secondary">
+                            <button id="importCombinedBtn" class="btn btn-secondary" style="display: none;">
                                 📁 Nhập File Kết hợp
                             </button>
                             <button id="addAccountBtn" class="btn btn-secondary">
                                 ➕ Thêm Tài khoản Mới
                             </button>
                         </div>
-                        <textarea id="combinedInput" placeholder="email1|password1|secret1|dataA1|dataB1|dataC1|dataD1&#10;email2|password2|secret2|dataA2|dataB2|dataC2|dataD2"></textarea>
+                        <textarea style="display: none;" id="combinedInput"
+                            placeholder="email1|password1|secret1|dataA1|dataB1|dataC1|dataD1&#10;email2|password2|secret2|dataA2|dataB2|dataC2|dataD2"></textarea>
                         <div class="info">
                             <span id="combinedCount">0 tài khoản với dữ liệu đã tải</span>
                         </div>
@@ -72,7 +78,7 @@
                                     🗑️ Xóa Tài khoản
                                 </button>
                             </div>
-                            
+
                             <div id="accountDataForm" class="account-data-form" style="display: none;">
                                 <div class="form-row">
                                     <div class="form-group">
@@ -88,7 +94,7 @@
                                         <input type="text" id="editSecretKey" placeholder="khóa bí mật 2FA">
                                     </div>
                                 </div>
-                                
+
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label for="editDataA">Dữ liệu A:</label>
@@ -99,7 +105,7 @@
                                         <textarea id="editDataB" rows="3" placeholder="Dữ liệu cho cột B"></textarea>
                                     </div>
                                 </div>
-                                
+
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label for="editDataC">Dữ liệu C:</label>
@@ -110,7 +116,7 @@
                                         <textarea id="editDataD" rows="3" placeholder="Dữ liệu cho cột D"></textarea>
                                     </div>
                                 </div>
-                                
+
                                 <div class="form-actions">
                                     <button id="saveAccountBtn" class="btn btn-primary">
                                         💾 Lưu Dữ liệu Tài khoản
@@ -153,38 +159,6 @@
                     </div>
                 </div>
 
-                <!-- Fill Data Function -->
-                <div class="section" style="display: none;">
-                    <h3>📝 Hàm Điền Dữ liệu</h3>
-                    <div class="function-controls">
-                        <button id="autoGenerateBtn" class="btn btn-info">
-                            🔄 Tự động Tạo Hàm
-                        </button>
-                        <button id="previewFunctionBtn" class="btn btn-secondary">
-                            👁️ Xem trước Hàm được Tạo
-                        </button>
-                        <button id="clearFunctionBtn" class="btn btn-secondary">
-                            🗑️ Xóa Hàm
-                        </button>
-                    </div>
-                    <div class="function-status">
-                        <span id="functionStatus">Hàm sẽ được tự động tạo dựa trên dữ liệu của bạn</span>
-                    </div>
-                    <textarea id="fillDataFunction" rows="15" placeholder="Hàm sẽ được tự động tạo dựa trên tài khoản và dữ liệu của bạn. Bạn cũng có thể viết hàm tùy chỉnh tại đây nếu cần."></textarea>
-                    
-                    <!-- Function Preview Modal -->
-                    <div id="functionPreview" class="function-preview" style="display: none;">
-                        <div class="preview-content">
-                            <h4>📋 Xem trước Hàm được Tạo</h4>
-                            <pre id="previewCode"></pre>
-                            <div class="preview-actions">
-                                <button id="useFunctionBtn" class="btn btn-primary">✅ Sử dụng Hàm này</button>
-                                <button id="cancelPreviewBtn" class="btn btn-secondary">❌ Hủy</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Concurrency Settings -->
                 <div class="section">
                     <h3>⚡ Cài đặt Đồng thời</h3>
@@ -216,13 +190,13 @@
                 <div id="status" class="status-display">
                     <p>Sẵn sàng để bắt đầu tự động hóa...</p>
                 </div>
-                
+
                 <!-- Workers Status -->
                 <div class="workers-status">
                     <h3>👷 Trạng thái Workers</h3>
                     <div id="workersContainer"></div>
                 </div>
-                
+
                 <!-- Logs -->
                 <div class="logs">
                     <h3>📝 Nhật ký</h3>
@@ -234,4 +208,5 @@
 
     <script src="renderer.js"></script>
 </body>
+
 </html>

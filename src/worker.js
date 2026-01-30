@@ -26,7 +26,7 @@ class WorkerProcess {
       message,
       data,
       progress,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 
@@ -34,9 +34,9 @@ class WorkerProcess {
   getDefaultFillDataFunction(account, globalData) {
     // Use account-specific data if available, otherwise use global data
     const data = account.data || globalData;
-    
+
     if (!data) {
-      throw new Error('No data available for account');
+      throw new Error("No data available for account");
     }
 
     // If account has specific data, create arrays with just that account's data
@@ -44,9 +44,9 @@ class WorkerProcess {
     if (account.data) {
       dataArrays = {
         A: [data.A],
-        B: [data.B], 
+        B: [data.B],
         C: [data.C],
-        D: [data.D]
+        D: [data.D],
       };
     } else {
       // Use global data arrays
@@ -63,7 +63,7 @@ function fillRandomData() {
   
   const startRow = 2;
   const numRows = Math.min(A_Data.length, B_Data.length, C_Data.length, D_Data.length);
-  
+  sheet.getRange(startRow, 3, numRows, 2).clearContent();
   for (let i = 0; i < numRows; i++) {
     sheet.getRange(startRow + i, 1).setValue(A_Data[i]);
     sheet.getRange(startRow + i, 2).setValue(B_Data[i]);
@@ -201,15 +201,25 @@ function isValidEmail_(email) {
   // Process single account
   async processAccount(account, accountIndex, totalAccounts) {
     const { email, password, secretKey } = account;
-    
-    try {
-      this.sendMessage('progress', `Processing account ${accountIndex + 1}/${totalAccounts}: ${email}`, null, {
-        current: accountIndex + 1,
-        total: totalAccounts
-      });
 
-      const userDataDir = path.join(__dirname, '..', 'user-data', `worker-${process.pid}-${accountIndex}`);
-      
+    try {
+      this.sendMessage(
+        "progress",
+        `Processing account ${accountIndex + 1}/${totalAccounts}: ${email}`,
+        null,
+        {
+          current: accountIndex + 1,
+          total: totalAccounts,
+        },
+      );
+
+      const userDataDir = path.join(
+        __dirname,
+        "..",
+        "user-data",
+        `worker-${email}`,
+      );
+
       // Launch browser with persistent context
       const browser = await chromium.launchPersistentContext(userDataDir, {
         headless: false, // Set to true for headless mode in production
@@ -217,12 +227,13 @@ function isValidEmail_(email) {
           "--disable-blink-features=AutomationControlled",
           "--disable-infobars",
         ],
-        executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        executablePath:
+          "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
       });
 
       const page = await browser.newPage();
 
-      this.sendMessage('progress', `Logging in to Google account: ${email}`);
+      this.sendMessage("progress", `Logging in to Google account: ${email}`);
 
       // Navigate to Google login
       await page.goto("https://accounts.google.com/signin", {
@@ -242,10 +253,14 @@ function isValidEmail_(email) {
       await page.waitForTimeout(3000);
 
       // Handle 2FA if required
-      if (await page.locator('input[type="tel"], input[aria-label*="code"]').isVisible()) {
-        this.sendMessage('progress', `Handling 2FA for ${email}`);
+      if (
+        await page
+          .locator('input[type="tel"], input[aria-label*="code"]')
+          .isVisible()
+      ) {
+        this.sendMessage("progress", `Handling 2FA for ${email}`);
         const code = await this.get2FACode(secretKey);
-        
+
         await page.fill('input[type="tel"], input[placeholder*="code"]', code);
         await this.delay(1000);
 
@@ -256,24 +271,36 @@ function isValidEmail_(email) {
       }
 
       // Handle "Not now" or "Skip" buttons
-      if (await page.locator('button:has-text("Not now"), button:has-text("Skip")').isVisible()) {
-        await page.locator('button:has-text("Not now"), button:has-text("Skip")').click();
+      if (
+        await page
+          .locator('button:has-text("Not now"), button:has-text("Skip")')
+          .isVisible()
+      ) {
+        await page
+          .locator('button:has-text("Not now"), button:has-text("Skip")')
+          .click();
         await this.delay(2000);
       }
 
-      this.sendMessage('progress', `Creating new Google Sheet for ${email}`);
+      this.sendMessage("progress", `Creating new Google Sheet for ${email}`);
 
       // Navigate to Google Sheets and create new sheet
       await this.delay(10000);
-      await page.goto("https://docs.google.com/spreadsheets/create");
+      try {
+        await page.goto("https://docs.google.com/spreadsheets/create");
+      } catch {
+        // refresh
+        await page.reload();
+        await page.goto("https://docs.google.com/spreadsheets/create");
+      }
       await this.delay(2000);
 
       // Navigate to specific spreadsheet (if needed)
-      await page.goto(
-        "https://docs.google.com/spreadsheets/d/1mVQ44j5Q0ecnrXIglQ4QxtV3eJHSZQpRFSRQI1VgvTo/edit?gid=0#gid=0"
-      );
+      // await page.goto(
+      //   "https://docs.google.com/spreadsheets/d/1mVQ44j5Q0ecnrXIglQ4QxtV3eJHSZQpRFSRQI1VgvTo/edit?gid=0#gid=0",
+      // );
 
-      this.sendMessage('progress', `Opening Apps Script for ${email}`);
+      this.sendMessage("progress", `Opening Apps Script for ${email}`);
 
       // Open Apps Script
       const extensionsMenuSelector = "#docs-extensions-menu";
@@ -291,32 +318,41 @@ function isValidEmail_(email) {
 
       // Execute functions in Apps Script
       await this.executeFunction(newPage, this.getPermissionRequiredFunction());
-      this.sendMessage('progress', `Permission function executed for ${email}`);
+      this.sendMessage("progress", `Permission function executed for ${email}`);
 
       // Handle permission authorization
       await this.handlePermissionAuthorization(browser, newPage, secretKey);
 
       // Execute fill data function with account-specific or global data
-      const fillDataFunc = this.config.fillDataFunc || this.getDefaultFillDataFunction(account, this.config.data);
+      const fillDataFunc = this.getDefaultFillDataFunction(
+        account,
+        this.config.data,
+      );
       await this.executeFunction(newPage, fillDataFunc);
-      this.sendMessage('progress', `Fill data function executed for ${email}`);
+      this.sendMessage("progress", `Fill data function executed for ${email}`);
+      await this.delay(5000);
 
       // Execute send emails function
       await this.executeFunction(newPage, this.getSendEmailsFunction());
-      this.sendMessage('progress', `Send emails function executed for ${email}`);
+      this.sendMessage(
+        "progress",
+        `Send emails function executed for ${email}`,
+      );
 
       // Monitor execution and re-run if needed
       await this.monitorExecution(newPage);
 
-      this.sendMessage('success', `Account ${email} processed successfully`);
+      this.sendMessage("success", `Account ${email} processed successfully`);
 
       // Close browser
       await browser.close();
 
       return { success: true, account: email };
-
     } catch (error) {
-      this.sendMessage('error', `Error processing account ${email}: ${error.message}`);
+      this.sendMessage(
+        "error",
+        `Error processing account ${email}: ${error.message}`,
+      );
       return { success: false, account: email, error: error.message };
     }
   }
@@ -351,13 +387,18 @@ function isValidEmail_(email) {
     // Run script (Ctrl + R)
     await page.keyboard.press("Control+KeyR");
     await page.keyboard.up("Control");
+    await this.delay(5000);
   }
 
   // Handle permission authorization
   async handlePermissionAuthorization(browser, newPage, secretKey) {
     try {
+      await this.delay(5000);
       await newPage.evaluate(async () => {
-        document.querySelector("[role='dialog']").querySelectorAll("button")[1].click();
+        document
+          .querySelector("[role='dialog']")
+          .querySelectorAll("button")[1]
+          .click();
       });
 
       const [reviewPermissionsPage] = await Promise.all([
@@ -372,7 +413,7 @@ function isValidEmail_(email) {
         const otpCode = await this.get2FACode(secretKey);
         await reviewPermissionsPage.fill(
           'input[type="tel"], input[aria-label*="code"]',
-          otpCode
+          otpCode,
         );
         await this.delay(1000);
         await reviewPermissionsPage.click('#totpNext, button[type="submit"]');
@@ -381,7 +422,9 @@ function isValidEmail_(email) {
       }
 
       // Click "Advanced"
-      await reviewPermissionsPage.locator('a:has-text("Advanced")').click({ timeout: 10000 });
+      await reviewPermissionsPage
+        .locator('a:has-text("Advanced")')
+        .click({ timeout: 10000 });
 
       // Click "Go to Untitled project (unsafe)"
       await reviewPermissionsPage
@@ -395,10 +438,14 @@ function isValidEmail_(email) {
 
       // Select all permissions
       try {
-        await reviewPermissionsPage.locator("text=Select all").click({ timeout: 10000 });
+        await reviewPermissionsPage
+          .locator("text=Select all")
+          .click({ timeout: 10000 });
       } catch (error) {
         await reviewPermissionsPage.evaluate(() => {
-          const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+          const checkboxes = document.querySelectorAll(
+            'input[type="checkbox"]',
+          );
           checkboxes.forEach((checkbox) => {
             if (!checkbox.checked) {
               checkbox.click();
@@ -416,9 +463,11 @@ function isValidEmail_(email) {
       await newPage.waitForSelector('div:has-text("Execution completed")', {
         timeout: 60000,
       });
-
     } catch (error) {
-      throw new Error(`Permission authorization failed: ${error.message}`);
+      this.sendMessage(
+        "info",
+        "Không tìm thấy hộp thoại ủy quyền bỏ qua chạy tiếp scripts.",
+      );
     }
   }
 
@@ -426,7 +475,7 @@ function isValidEmail_(email) {
   async monitorExecution(newPage) {
     return new Promise((resolve) => {
       let attempts = 0;
-      const maxAttempts = 10;
+      const maxAttempts = 100;
 
       const checkExecution = async () => {
         if (attempts >= maxAttempts) {
@@ -439,9 +488,9 @@ function isValidEmail_(email) {
           if (itemList.length > 0) {
             const lastItem = itemList[itemList.length - 1];
             const texts = lastItem.querySelectorAll("div");
-            
+
             const errorDiv = Array.from(texts).find((div) =>
-              div.textContent.includes("Exceeded maximum execution time.")
+              div.textContent.includes("Exceeded maximum execution time."),
             );
 
             if (errorDiv) {
@@ -449,7 +498,7 @@ function isValidEmail_(email) {
             }
 
             const success = Array.from(texts).find((div) =>
-              div.textContent.includes("Execution completed")
+              div.textContent.includes("Execution completed"),
             );
 
             if (success) {
@@ -461,12 +510,18 @@ function isValidEmail_(email) {
         });
 
         if (result.timeout) {
-          this.sendMessage('progress', `Execution timeout detected, re-running script (attempt ${attempts + 1})`);
+          this.sendMessage(
+            "progress",
+            `Execution timeout detected, re-running script (attempt ${attempts + 1})`,
+          );
           await this.reRunScript(newPage);
           attempts++;
           setTimeout(checkExecution, 5000);
         } else if (result.success) {
-          this.sendMessage('progress', `Script execution completed successfully`);
+          this.sendMessage(
+            "progress",
+            `Script execution completed successfully`,
+          );
           resolve();
         } else {
           setTimeout(checkExecution, 5000);
@@ -488,35 +543,46 @@ function isValidEmail_(email) {
     this.config = config;
     this.isRunning = true;
 
-    this.sendMessage('progress', `Worker started processing ${config.accounts.length} accounts`);
+    this.sendMessage(
+      "progress",
+      `Worker started processing ${config.accounts.length} accounts`,
+    );
 
     const results = [];
 
     for (let i = 0; i < config.accounts.length; i++) {
       if (!this.isRunning) {
-        this.sendMessage('progress', 'Worker stopped by request');
+        this.sendMessage("progress", "Worker stopped by request");
         break;
       }
 
       const account = config.accounts[i];
-      const result = await this.processAccount(account, i, config.accounts.length);
+      const result = await this.processAccount(
+        account,
+        i,
+        config.accounts.length,
+      );
       results.push(result);
 
       // Small delay between accounts
       await this.delay(2000);
     }
 
-    this.sendMessage('completed', `Worker completed processing ${results.length} accounts`, {
-      results,
-      successCount: results.filter(r => r.success).length,
-      errorCount: results.filter(r => !r.success).length
-    });
+    this.sendMessage(
+      "completed",
+      `Worker completed processing ${results.length} accounts`,
+      {
+        results,
+        successCount: results.filter((r) => r.success).length,
+        errorCount: results.filter((r) => !r.success).length,
+      },
+    );
   }
 
   stop() {
     this.isRunning = false;
-    this.sendMessage('progress', 'Worker stopping...');
-    
+    this.sendMessage("progress", "Worker stopping...");
+
     if (this.browser) {
       this.browser.close().catch(console.error);
     }
@@ -527,34 +593,34 @@ function isValidEmail_(email) {
 const worker = new WorkerProcess();
 
 // Handle messages from main process
-process.on('message', async (message) => {
-  if (message.type === 'start') {
+process.on("message", async (message) => {
+  if (message.type === "start") {
     await worker.start(message.config);
-  } else if (message.type === 'stop') {
+  } else if (message.type === "stop") {
     worker.stop();
   }
 });
 
 // Handle process termination
-process.on('SIGTERM', () => {
+process.on("SIGTERM", () => {
   worker.stop();
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
+process.on("SIGINT", () => {
   worker.stop();
   process.exit(0);
 });
 
 // Handle uncaught errors
-process.on('uncaughtException', (error) => {
-  worker.sendMessage('error', `Uncaught exception: ${error.message}`);
+process.on("uncaughtException", (error) => {
+  worker.sendMessage("error", `Uncaught exception: ${error.message}`);
   worker.stop();
   process.exit(1);
 });
 
-process.on('unhandledRejection', (reason) => {
-  worker.sendMessage('error', `Unhandled rejection: ${reason}`);
+process.on("unhandledRejection", (reason) => {
+  worker.sendMessage("error", `Unhandled rejection: ${reason}`);
   worker.stop();
   process.exit(1);
 });
