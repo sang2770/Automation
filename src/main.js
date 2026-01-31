@@ -197,13 +197,14 @@ class ElectronApp {
     // Bắt đầu automation với nhiều workers
     ipcMain.handle("start-automation", async (event, config) => {
       try {
-        const { accounts, data, concurrent, inputFormat } = config;
+        const { accounts, data, concurrent, inputFormat, customSendEmailsFunction } = config;
 
         // Save automation settings to config
         await this.updateConfig("automation", {
           concurrent: concurrent,
           inputFormat: inputFormat,
           lastRunDate: new Date().toISOString(),
+          customSendEmailsFunction: customSendEmailsFunction,
         });
 
         console.log(
@@ -228,6 +229,7 @@ class ElectronApp {
               accounts: workerAccounts,
               data,
               inputFormat,
+              customSendEmailsFunction: config.customSendEmailsFunction,
               workerIndex: i,
             });
 

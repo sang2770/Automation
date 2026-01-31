@@ -544,6 +544,17 @@ function isValidEmail_(email) {
             if (success) {
               return { success: true };
             }
+
+            // An unknown error has occurred, please try again later
+            const unknownErrorDiv = Array.from(texts).find((div) =>
+              div.textContent.includes(
+                "An unknown error has occurred, please try again later",
+              ),
+            );
+
+            if (unknownErrorDiv) {
+              return { error: true };
+            }
           }
 
           return {};
@@ -564,6 +575,14 @@ function isValidEmail_(email) {
           );
           resolve();
         } else {
+          // Unknown error or still running
+          this.sendMessage(
+            "progress",
+            `Waiting for script execution to complete (attempt ${attempts + 1})`,
+          );
+          // reload and re-run
+          await this.reRunScript(newPage);
+          attempts++;
           setTimeout(checkExecution, 5000);
         }
       };

@@ -1,6 +1,8 @@
 class AutomationApp {
   constructor() {
     this.accounts = [];
+    this.accountCombinedList = [];
+    this.accountSeparatedList = [];
     this.data = { A: [], B: [], C: [], D: [] };
     this.isRunning = false;
     this.workers = [];
@@ -171,11 +173,8 @@ class AutomationApp {
         const config = result.config;
         this.inputFormat = config.automation.inputFormat || "separated";
 
-        // Load accounts data
-        if (config.accounts && config.accounts.length > 0) {
-          console.log("Handle Accounts");
-          // New structure: array of account objects
-          this.accounts = config.accounts.map((acc) => ({
+        const parseAccountList = (accountList) => {
+          return accountList.map((acc) => ({
             email: acc.email || "",
             password: acc.password || "",
             secretKey: acc.secretKey || "",
@@ -196,7 +195,17 @@ class AutomationApp {
               }
               : null,
           }));
+        };
+        this.accountSeparatedList = parseAccountList(config.accountSeparatedList || []);
+        this.accountCombinedList = parseAccountList(config.accountCombinedList || []);
+        if (this.inputFormat === "separated") {
+          this.accounts = this.accountSeparatedList;
           this.updateAccountsTextarea();
+
+        }
+        if (this.inputFormat === "combined") {
+          this.accounts = this.accountCombinedList;
+          this.updateCombinedTextarea();
         }
 
         // Load default shared data columns (for separated format)
@@ -262,9 +271,9 @@ class AutomationApp {
   }
 
   updateAccountsTextarea() {
-    // For separated format: just email:password:secret
+    // For separated format: just email|password|secret
     const lines = this.accounts.map(
-      (account) => `${account.email}:${account.password}:${account.secretKey}`,
+      (account) => `${account.email}|${account.password}|${account.secretKey}`,
     );
     this.accountsInput.value = lines.join("\n");
     this.accountsCount.textContent = `${this.accounts.length} accounts loaded`;
@@ -290,7 +299,7 @@ class AutomationApp {
               : null,
         }));
 
-        await window.electronAPI.updateConfig("accounts", accountsData);
+        await window.electronAPI.updateConfig(this.inputFormat === "combined" ? "accountCombinedList" : "accountSeparatedList", accountsData);
       }
 
       // Save default shared data columns (for separated format)
@@ -305,12 +314,11 @@ class AutomationApp {
         // Keep existing default data when in combined format
         // Don't clear it as it might be used when switching back to separated
       }
-
       // Save current automation settings
       await window.electronAPI.updateConfig("automation", {
         concurrent: parseInt(this.concurrentWorkers.value) || 1,
         inputFormat: this.inputFormat,
-        customSendEmailsFunction: this.customSendEmailsFunction.value.trim() || this.getDefaultSendEmailsFunction(),
+        customSendEmailsFunction: this.customSendEmailsFunction.value.trim(),
       });
 
       this.addLog("💾 Current state saved to config", "success");
@@ -393,12 +401,13 @@ class AutomationApp {
       this.separatedFormat.style.display = "block";
       this.combinedFormat.style.display = "none";
       this.dataSection.style.display = "block";
-      this.parseAccounts();
+      this.accounts = this.accountSeparatedList;
     } else {
       this.separatedFormat.style.display = "none";
       this.combinedFormat.style.display = "block";
       this.dataSection.style.display = "none";
-      this.parseCombinedInput();
+      this.accounts = this.accountCombinedList;
+      this.updateCombinedTextarea();
       this.updateAccountEditor();
     }
 
@@ -552,7 +561,7 @@ class AutomationApp {
     this.updateCombinedTextarea();
     this.updateAccountSelect();
     this.accountSelect.value = this.currentEditingAccountIndex; // Keep selection
-
+    this.debouncedSave();
     this.addLog(`💾 Saved data for account: ${account.email}`, "success");
   }
 
@@ -625,33 +634,6 @@ class AutomationApp {
   }
 
   updateCombinedTextarea() {
-    const lines = this.accounts.map((account) => {
-      const accountPart = `${account.email || ""}:${account.password || ""}:${account.secretKey || ""}`;
-      const dataA = account.data?.A
-        ? Array.isArray(account.data.A)
-          ? account.data.A.join(";")
-          : account.data.A
-        : "";
-      const dataB = account.data?.B
-        ? Array.isArray(account.data.B)
-          ? account.data.B.join(";")
-          : account.data.B
-        : "";
-      const dataC = account.data?.C
-        ? Array.isArray(account.data.C)
-          ? account.data.C.join(";")
-          : account.data.C
-        : "";
-      const dataD = account.data?.D
-        ? Array.isArray(account.data.D)
-          ? account.data.D.join(";")
-          : account.data.D
-        : "";
-      const dataPart = `|${dataA}|${dataB}|${dataC}|${dataD}`;
-      return accountPart + dataPart;
-    });
-
-    this.combinedInput.value = lines.join("\n");
     this.combinedCount.textContent = `${this.accounts.length} accounts with data loaded`;
   }
 
@@ -692,10 +674,10 @@ class AutomationApp {
     this.accounts = [];
 
     for (const line of lines) {
-      const parts = line.split(":").map((part) => part.trim());
+      const parts = line.split("|").map((part) => part.trim());
       if (parts.length >= 3) {
         // Check if there's data after the secret key (format: email:pass:secret|A|B|C|D)
-        const restOfLine = parts.slice(3).join(":"); // Rejoin in case there were colons in data
+        const restOfLine = parts.slice(3).join("|"); // Rejoin in case there were pipes in data
         const dataParts = restOfLine.split("|").map((part) => part.trim());
 
         this.accounts.push({
@@ -780,7 +762,6 @@ class AutomationApp {
 
   parseAccounts() {
     const text = this.accountsInput.value.trim();
-    console.log("Parsing accounts from input:", text);
 
     if (!text) {
       this.accounts = [];
@@ -792,7 +773,7 @@ class AutomationApp {
     this.accounts = [];
 
     for (const line of lines) {
-      const parts = line.split(":");
+      const parts = line.split("|");
       if (parts.length >= 3) {
         this.accounts.push({
           email: parts[0].trim(),
