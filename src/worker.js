@@ -574,15 +574,18 @@ function isValidEmail_(email) {
             `Script execution completed successfully`,
           );
           resolve();
-        } else {
+        } else if (result.error) {
           // Unknown error or still running
+
+          // reload and re-run
+          await this.reRunScript(newPage);
+          attempts++;
+          setTimeout(checkExecution, 5000);
+        } else {
           this.sendMessage(
             "progress",
             `Waiting for script execution to complete (attempt ${attempts + 1})`,
           );
-          // reload and re-run
-          await this.reRunScript(newPage);
-          attempts++;
           setTimeout(checkExecution, 5000);
         }
       };
