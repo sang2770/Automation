@@ -148,10 +148,6 @@ class ElectronApp {
 
     // Start automation
     ipcMain.handle("start-automation", async (event, config) => {
-      if (this.isRunning) {
-        console.log("Automation is already running");
-        return { success: false, error: "Automation is already running" };
-      }
       try {
         this.isRunning = true;
         let workerPath = getResourcePath("automation/youtube-worker.js");
@@ -209,11 +205,6 @@ class ElectronApp {
         this.isRunning,
         this.workerProcess,
       );
-
-      if (!this.isRunning || !this.workerProcess) {
-        return { success: false, error: "No automation is running" };
-      }
-
       try {
         this.workerProcess.send({ type: "stop" });
         return { success: true };
