@@ -34,7 +34,12 @@ class WorkerProcess {
   // Generate default fillDataFuncString with account-specific or global data
   getDefaultFillDataFunction(account, globalData) {
     // Use account-specific data if available, otherwise use global data
-    const data = account.data || globalData;
+    let data = account.data || globalData;
+
+    // Nếu là chế độ separated và có distributedData, sử dụng dữ liệu đã chia
+    if (account.distributedData) {
+      data = account.distributedData;
+    }
 
     if (!data) {
       throw new Error("No data available for account");
@@ -42,7 +47,7 @@ class WorkerProcess {
 
     // If account has specific data, create arrays with just that account's data
     let dataArrays;
-    if (account.data) {
+    if (account.data || account.distributedData) {
       dataArrays = {
         A: data.A,
         B: data.B,
@@ -250,8 +255,8 @@ function isValidEmail_(email) {
           "--disable-infobars",
         ],
         executablePath:
-          "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-        // "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          // "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
       });
 
       const page = await browser.newPage();
@@ -300,11 +305,11 @@ function isValidEmail_(email) {
       // Handle "Not now" or "Skip" buttons
       if (
         await page
-          .locator('button:has-text("Not now"), button:has-text("Skip")')
+          .locator('button:has-text("Continue"), button:has-text("Not now"), button:has-text("Skip")')
           .isVisible()
       ) {
         await page
-          .locator('button:has-text("Not now"), button:has-text("Skip")')
+          .locator('button:has-text("Continue"), button:has-text("Not now"), button:has-text("Skip")')
           .click();
         await this.delay(2000);
       }
@@ -328,12 +333,25 @@ function isValidEmail_(email) {
       // );
 
       this.sendMessage("progress", `Opening Apps Script for ${email}`);
-
-      // Open Apps Script
-      const extensionsMenuSelector = "#docs-extensions-menu";
-      await page.waitForSelector(extensionsMenuSelector, { timeout: 30000 });
-      await page.click(extensionsMenuSelector, { force: true });
-      await this.delay(2000);
+      let attempts = 0;
+      const maxAttempts = 3;
+      while (attempts < maxAttempts) {
+        try {
+          // Open Apps Script
+          const extensionsMenuSelector = "#docs-extensions-menu";
+          await page.waitForSelector(extensionsMenuSelector, { timeout: 30000 });
+          await page.click(extensionsMenuSelector, { force: true });
+          await this.delay(2000);
+          break;
+        }
+        catch (error) {
+          await page.reload();
+        }
+        attempts++;
+      }
+      if (attempts === maxAttempts) {
+        throw new Error("Không thể mở menu Extensions sau nhiều lần thử.");
+      }
 
       const [newPage] = await Promise.all([
         browser.waitForEvent("page"),
@@ -435,6 +453,19 @@ function isValidEmail_(email) {
     try {
       await this.delay(10000);
       await newPage.evaluate(async () => {
+        let attempts = 0;
+        const maxAttempts = 5;
+
+        const checkDialog = () => {
+          return document.querySelector("[role='dialog']") !== null;
+        }
+        while (attempts < maxAttempts) {
+          if (checkDialog()) {
+            break;
+          }
+          await new Promise(res => setTimeout(res, 2000));
+          attempts++;
+        }
         document
           .querySelector("[role='dialog']")
           .querySelectorAll("button")[1]
@@ -443,7 +474,7 @@ function isValidEmail_(email) {
 
       const [reviewPermissionsPage] = await Promise.all([
         browser.waitForEvent("page"),
-        newPage.waitForTimeout(2000),
+        newPage.waitForTimeout(10000),
       ]);
 
       await reviewPermissionsPage.waitForLoadState();
@@ -530,7 +561,7 @@ function isValidEmail_(email) {
             const texts = lastItem.querySelectorAll("div");
 
             const errorDiv = Array.from(texts).find((div) =>
-              div.textContent.includes("Exceeded maximum execution time."),
+              div.textContent.includes("Exceeded maximum execution time"),
             );
 
             if (errorDiv) {

@@ -188,6 +188,24 @@ small {
     min-height: 80px;
 }
 
+.data-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    align-items: center;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #f7b731 0%, #f39c12 100%);
+    color: white;
+    border: none;
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    transform: translateY(-1px);
+}
+
 /* Status and Info */
 .info {
     background: #f7fafc;
@@ -195,6 +213,20 @@ small {
     border-radius: 6px;
     margin-top: 10px;
     border-left: 4px solid #4facfe;
+}
+
+.data-info {
+    background: #e6fffa;
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 15px;
+    border-left: 4px solid #38d9a9;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.data-info strong {
+    color: #087f5b;
 }
 
 .status-display {
@@ -787,4 +819,9 @@ small {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #3182ce;
+}
+
+#logsContainer {
+    max-height: 300px;
+    overflow-y: auto;
 }

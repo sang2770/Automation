@@ -8,6 +8,7 @@ class AutomationApp {
     this.workers = [];
     this.inputFormat = "separated"; // 'separated' or 'combined'
     this.saveTimeout = null; // For debouncing auto-save
+    this.usedDataIndexes = { A: [], B: [] }; // Track used data indexes for cleanup
 
     this.initializeElements();
     this.setupEventListeners();
@@ -277,6 +278,7 @@ class AutomationApp {
     );
     this.accountsInput.value = lines.join("\n");
     this.accountsCount.textContent = `${this.accounts.length} accounts loaded`;
+    this.updateDataStats(); // Cập nhật thông tin chia dữ liệu
     console.log("Accounts textarea updated");
   }
 
@@ -402,6 +404,7 @@ class AutomationApp {
       this.combinedFormat.style.display = "none";
       this.dataSection.style.display = "block";
       this.accounts = this.accountSeparatedList;
+      this.updateDataStats(); // Cập nhật thông tin chia dữ liệu
     } else {
       this.separatedFormat.style.display = "none";
       this.combinedFormat.style.display = "block";
@@ -409,6 +412,7 @@ class AutomationApp {
       this.accounts = this.accountCombinedList;
       this.updateCombinedTextarea();
       this.updateAccountEditor();
+      this.updateDataStats(); // Ẩn thông tin chia dữ liệu
     }
 
     // Save format change
@@ -766,6 +770,7 @@ class AutomationApp {
     if (!text) {
       this.accounts = [];
       this.accountsCount.textContent = "0 accounts loaded";
+      this.updateDataStats(); // Cập nhật thông tin chia dữ liệu
       return;
     }
 
@@ -785,6 +790,7 @@ class AutomationApp {
     }
 
     this.accountsCount.textContent = `${this.accounts.length} accounts loaded`;
+    this.updateDataStats(); // Cập nhật thông tin chia dữ liệu
     this.debouncedSave(); // Auto-save when accounts change
   }
 
@@ -802,7 +808,141 @@ class AutomationApp {
       .split("\n")
       .filter((line) => line.trim());
 
+    // Cập nhật thông tin số lượng dữ liệu
+    this.updateDataStats();
     this.debouncedSave(); // Auto-save when data changes
+  }
+
+  // Cập nhật thông tin thống kê dữ liệu
+  updateDataStats() {
+    if (this.inputFormat === "separated" && this.accounts.length > 0) {
+      const minLength = Math.min(
+        this.data.A.length,
+        this.data.B.length,
+        this.data.C.length,
+        this.data.D.length
+      );
+      const itemsPerAccount = Math.floor(minLength / this.accounts.length);
+
+      // Cập nhật thông tin hiển thị
+      let dataInfo = document.querySelector('.data-info');
+      if (!dataInfo) {
+        dataInfo = document.createElement('div');
+        dataInfo.className = 'data-info info';
+        this.dataSection.appendChild(dataInfo);
+      }
+
+      if (minLength > 0 && itemsPerAccount > 0) {
+        dataInfo.innerHTML = `📊 Dữ liệu sẽ được chia đều: <strong>${itemsPerAccount} items/tài khoản</strong> cho ${this.accounts.length} tài khoản<br>
+        <small>📝 A:${this.data.A.length}, B:${this.data.B.length}, C:${this.data.C.length}, D:${this.data.D.length}</small><br>
+        <small>🤖 <em>Cột A và B sẽ tự động xóa sau khi hoàn thành, cột C và D giữ nguyên</em></small>`;
+        dataInfo.style.display = 'block';
+      } else {
+        dataInfo.innerHTML = `⚠️ Không đủ dữ liệu để chia cho ${this.accounts.length} tài khoản. Cần ít nhất ${this.accounts.length} items trong mỗi cột.`;
+        dataInfo.style.display = 'block';
+      }
+    } else {
+      // Ẩn thông tin nếu không phải chế độ separated
+      const dataInfo = document.querySelector('.data-info');
+      if (dataInfo) {
+        dataInfo.style.display = 'none';
+      }
+    }
+  }
+
+  // Chia đều dữ liệu cho các account trong chế độ separated
+  distributeDataToAccounts() {
+    if (this.inputFormat !== "separated" || this.accounts.length === 0) {
+      return this.data;
+    }
+
+    const accountCount = this.accounts.length;
+
+    // Tìm số lượng tối thiểu của các cột
+    const minLength = Math.min(
+      this.data.A.length,
+      this.data.B.length,
+      this.data.C.length,
+      this.data.D.length
+    );
+
+    if (minLength === 0) {
+      this.addLog("⚠️ Không có đủ dữ liệu trong các cột A, B, C, D", "warning");
+      return this.data;
+    }
+
+    // Tính số dữ liệu mỗi account nhận
+    const itemsPerAccount = Math.floor(minLength / accountCount);
+
+    if (itemsPerAccount === 0) {
+      this.addLog(`⚠️ Không đủ dữ liệu để chia cho ${accountCount} tài khoản. Cần ít nhất ${accountCount} items trong mỗi cột.`, "warning");
+      return this.data;
+    }
+
+    // Reset usage tracking
+    this.usedDataIndexes = { A: [], B: [] };
+
+    // Cập nhật accounts với dữ liệu được chia
+    for (let i = 0; i < accountCount; i++) {
+      const startIndex = i * itemsPerAccount;
+      const endIndex = Math.min(startIndex + itemsPerAccount, minLength);
+
+      // Track indexes sẽ được sử dụng cho cột A và B
+      for (let j = startIndex; j < endIndex; j++) {
+        this.usedDataIndexes.A.push(j);
+        this.usedDataIndexes.B.push(j);
+      }
+
+      // Gán dữ liệu chia đều cho từng account
+      this.accounts[i].data = {
+        A: this.data.A.slice(startIndex, endIndex),
+        B: this.data.B.slice(startIndex, endIndex),
+        C: this.data.C.slice(startIndex, endIndex),
+        D: this.data.D.slice(startIndex, endIndex)
+      };
+    }
+
+    this.addLog(`📊 Đã chia đều dữ liệu: ${itemsPerAccount} items/account cho ${accountCount} tài khoản (tổng: ${minLength} items)`, "info");
+
+    return this.data;
+  }
+
+  // Cleanup dữ liệu đã sử dụng từ cột A và B
+  cleanupUsedData() {
+    if (this.inputFormat !== "separated" || !this.usedDataIndexes) {
+      return;
+    }
+
+    // Sắp xếp indexes theo thứ tự giảm dần để xóa từ cuối lên đầu
+    const sortedIndexesA = [...new Set(this.usedDataIndexes.A)].sort((a, b) => b - a);
+    const sortedIndexesB = [...new Set(this.usedDataIndexes.B)].sort((a, b) => b - a);
+
+    // Xóa dữ liệu đã sử dụng từ cột A
+    sortedIndexesA.forEach(index => {
+      if (index < this.data.A.length) {
+        this.data.A.splice(index, 1);
+      }
+    });
+
+    // Xóa dữ liệu đã sử dụng từ cột B
+    sortedIndexesB.forEach(index => {
+      if (index < this.data.B.length) {
+        this.data.B.splice(index, 1);
+      }
+    });
+
+    // Cập nhật UI
+    this.columnAData.value = this.data.A.join('\n');
+    this.columnBData.value = this.data.B.join('\n');
+
+    // Reset tracking
+    this.usedDataIndexes = { A: [], B: [] };
+
+    this.addLog(`🧹 Tự động xóa dữ liệu đã sử dụng từ cột A và B. Còn lại: A(${this.data.A.length}), B(${this.data.B.length}), C(${this.data.C.length}), D(${this.data.D.length})`, "info");
+
+    // Cập nhật thông tin hiển thị
+    this.updateDataStats();
+    this.debouncedSave();
   }
 
   async startAutomation() {
@@ -831,9 +971,14 @@ class AutomationApp {
     );
 
     try {
+      // Chia đều dữ liệu cho các account nếu là chế độ separated
+      if (this.inputFormat === "separated") {
+        this.distributeDataToAccounts();
+      }
+
       const config = {
         accounts: this.accounts,
-        data: this.inputFormat === "separated" ? this.data : null, // Global data only for separated format
+        data: null,
         concurrent,
         inputFormat: this.inputFormat,
         customSendEmailsFunction: this.customSendEmailsFunction.value.trim() || this.getDefaultSendEmailsFunction(),
@@ -852,6 +997,11 @@ class AutomationApp {
       this.addLog(`❌ Error starting automation: ${error.message}`, "error");
       this.updateStatus("❌ Error occurred", "error");
     } finally {
+      // Auto cleanup dữ liệu đã sử dụng từ cột A và B (luôn chạy sau khi hoàn thành)
+      if (this.inputFormat === "separated") {
+        this.cleanupUsedData();
+      }
+
       this.isRunning = false;
       this.startBtn.disabled = false;
       this.stopBtn.disabled = true;
