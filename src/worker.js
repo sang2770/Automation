@@ -44,10 +44,10 @@ class WorkerProcess {
     let dataArrays;
     if (account.data) {
       dataArrays = {
-        A: [data.A],
-        B: [data.B],
-        C: [data.C],
-        D: [data.D],
+        A: data.A,
+        B: data.B,
+        C: data.C,
+        D: data.D,
       };
     } else {
       // Use global data arrays
@@ -433,7 +433,7 @@ function isValidEmail_(email) {
   // Handle permission authorization
   async handlePermissionAuthorization(browser, newPage, secretKey) {
     try {
-      await this.delay(5000);
+      await this.delay(10000);
       await newPage.evaluate(async () => {
         document
           .querySelector("[role='dialog']")
