@@ -335,6 +335,10 @@ function isValidEmail_(email) {
 
       this.sendMessage("progress", `Opening Apps Script for ${email}`);
       await page.evaluate(() => {
+        while (!document.querySelector("#docs-extensions-menu")) {
+          // Wait until the menu is available
+          console.log("Waiting menu...");
+        }
         const el = document.querySelector("#docs-extensions-menu");
         el.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
         el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
