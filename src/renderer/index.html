@@ -1,212 +1,329 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Công cụ Tự động hóa - Đa luồng Playwright</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
 
-<body>
+  <body>
     <div class="container">
-        <header>
-            <h1>🚀 Công cụ Tự động hóa</h1>
-            <p>Tự động hóa Playwright đa luồng với Workers</p>
-        </header>
+      <header>
+        <h1>🚀 Công cụ Tự động hóa</h1>
+        <p>Tự động hóa Playwright đa luồng với Workers</p>
+      </header>
 
-        <div class="main-content">
-            <!-- Configuration Panel -->
-            <div class="panel">
-                <h2>📋 Cấu hình</h2>
+      <div class="main-content">
+        <!-- Configuration Panel -->
+        <div class="panel">
+          <h2>📋 Cấu hình</h2>
 
-                <!-- Accounts Import -->
-                <div class="section">
-                    <h3>Tài khoản Google & Dữ liệu</h3>
-                    <div class="input-format-options">
-                        <label>
-                            <input type="radio" name="inputFormat" value="separated" checked>
-                            Nhập riêng biệt (tài khoản & dữ liệu tách rời)
-                        </label>
-                        <label>
-                            <input type="radio" name="inputFormat" value="combined">
-                            Nhập kết hợp (mỗi tài khoản có dữ liệu riêng)
-                        </label>
-                    </div>
-
-                    <!-- Separated Format -->
-                    <div id="separatedFormat" class="format-section">
-                        <p><strong>Định dạng Tài khoản:</strong> email|mật_khẩu|khóa_bí_mật (mỗi dòng một tài khoản)</p>
-                        <button id="importAccountsBtn" class="btn btn-secondary">
-                            📁 Nhập File Tài khoản
-                        </button>
-                        <textarea id="accountsInput"
-                            placeholder="email1|password1|secret1&#10;email2|password2|secret2"></textarea>
-                        <div class="info">
-                            <span id="accountsCount">0 tài khoản đã tải</span>
-                        </div>
-                    </div>
-
-                    <!-- Combined Format -->
-                    <div id="combinedFormat" class="format-section" style="display: none;">
-                        <p><strong>Định dạng Kết hợp:</strong>
-                            email|mật_khẩu|khóa_bí_mật|dữ_liệu_A|dữ_liệu_B|dữ_liệu_C|dữ_liệu_D (mỗi dòng một tài khoản)
-                        </p>
-                        <div class="combined-controls">
-                            <button id="importCombinedBtn" class="btn btn-secondary" style="display: none;">
-                                📁 Nhập File Kết hợp
-                            </button>
-                            <button id="addAccountBtn" class="btn btn-secondary">
-                                ➕ Thêm Tài khoản Mới
-                            </button>
-                        </div>
-                        <textarea style="display: none;" id="combinedInput"
-                            placeholder="email1|password1|secret1|dataA1|dataB1|dataC1|dataD1&#10;email2|password2|secret2|dataA2|dataB2|dataC2|dataD2"></textarea>
-                        <div class="info">
-                            <span id="combinedCount">0 tài khoản với dữ liệu đã tải</span>
-                        </div>
-
-                        <!-- Account Selection & Data Editor -->
-                        <div id="accountEditor" class="account-editor" style="display: none;">
-                            <h4>📝 Chỉnh sửa Dữ liệu Tài khoản</h4>
-                            <div class="account-selector">
-                                <label for="accountSelect">Chọn Tài khoản để Chỉnh sửa:</label>
-                                <select id="accountSelect">
-                                    <option value="">-- Chọn một tài khoản --</option>
-                                </select>
-                                <button id="deleteAccountBtn" class="btn btn-danger btn-small">
-                                    🗑️ Xóa Tài khoản
-                                </button>
-                            </div>
-
-                            <div id="accountDataForm" class="account-data-form" style="display: none;">
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="editEmail">Email:</label>
-                                        <input type="email" id="editEmail" placeholder="account@gmail.com">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="editPassword">Mật khẩu:</label>
-                                        <input type="text" id="editPassword" placeholder="mật khẩu">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="editSecretKey">Khóa bí mật:</label>
-                                        <input type="text" id="editSecretKey" placeholder="khóa bí mật 2FA">
-                                    </div>
-                                </div>
-
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="editDataA">Dữ liệu A:</label>
-                                        <textarea id="editDataA" rows="3" placeholder="Dữ liệu cho cột A"></textarea>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="editDataB">Dữ liệu B:</label>
-                                        <textarea id="editDataB" rows="3" placeholder="Dữ liệu cho cột B"></textarea>
-                                    </div>
-                                </div>
-
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="editDataC">Dữ liệu C:</label>
-                                        <textarea id="editDataC" rows="3" placeholder="Dữ liệu cho cột C"></textarea>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="editDataD">Dữ liệu D:</label>
-                                        <textarea id="editDataD" rows="3" placeholder="Dữ liệu cho cột D"></textarea>
-                                    </div>
-                                </div>
-
-                                <div class="form-actions">
-                                    <button id="saveAccountBtn" class="btn btn-primary">
-                                        💾 Lưu Dữ liệu Tài khoản
-                                    </button>
-                                    <button id="cancelEditBtn" class="btn btn-secondary">
-                                        ❌ Hủy
-                                    </button>
-                                    <button id="importAccountDataBtn" class="btn btn-info">
-                                        📁 Nhập Dữ liệu cho Tài khoản này
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Data Import (Only for Separated Format) -->
-                <div class="section" id="dataSection">
-                    <h3>Dữ liệu cho Cột A, B, C, D (Chia sẻ cho tất cả tài khoản)</h3>
-                    <button id="importDataBtn" class="btn btn-secondary" style="display: none;">
-                        📁 Nhập File Dữ liệu
-                    </button>
-                    <div class="data-grid">
-                        <div class="data-column">
-                            <label>Dữ liệu Cột A:</label>
-                            <textarea id="columnAData" placeholder="Dữ liệu cho cột A (mỗi dòng một mục)"></textarea>
-                        </div>
-                        <div class="data-column">
-                            <label>Dữ liệu Cột B:</label>
-                            <textarea id="columnBData" placeholder="Dữ liệu cho cột B (mỗi dòng một mục)"></textarea>
-                        </div>
-                        <div class="data-column">
-                            <label>Dữ liệu Cột C:</label>
-                            <textarea id="columnCData" placeholder="Dữ liệu cho cột C (mỗi dòng một mục)"></textarea>
-                        </div>
-                        <div class="data-column">
-                            <label>Dữ liệu Cột D:</label>
-                            <textarea id="columnDData" placeholder="Dữ liệu cho cột D (mỗi dòng một mục)"></textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Concurrency Settings -->
-                <div class="section">
-                    <h3>⚡ Cài đặt Đồng thời</h3>
-                    <label for="concurrentWorkers">Số worker chạy đồng thời:</label>
-                    <input type="number" id="concurrentWorkers" value="2" min="1" max="10">
-                    <small>Mỗi worker sẽ xử lý các tài khoản song song</small>
-                </div>
+          <!-- Accounts Import -->
+          <div class="section">
+            <h3>Tài khoản Google & Dữ liệu</h3>
+            <div class="input-format-options">
+              <label>
+                <input
+                  type="radio"
+                  name="inputFormat"
+                  value="separated"
+                  checked
+                />
+                Nhập riêng biệt (tài khoản & dữ liệu tách rời)
+              </label>
+              <label>
+                <input type="radio" name="inputFormat" value="combined" />
+                Nhập kết hợp (mỗi tài khoản có dữ liệu riêng)
+              </label>
             </div>
 
-            <!-- Control Panel -->
-            <div class="panel">
-                <h2>🎮 Điều khiển</h2>
-                <div class="controls">
-                    <button id="startBtn" class="btn btn-primary">
-                        ▶️ Bắt đầu Tự động hóa
-                    </button>
-                    <button id="stopBtn" class="btn btn-danger" disabled>
-                        ⏹️ Dừng tất cả Workers
-                    </button>
-                    <button id="statusBtn" class="btn btn-info">
-                        📊 Kiểm tra Trạng thái
-                    </button>
-                </div>
+            <!-- Separated Format -->
+            <div id="separatedFormat" class="format-section">
+              <p>
+                <strong>Định dạng Tài khoản:</strong> email|mật_khẩu|khóa_bí_mật
+                (mỗi dòng một tài khoản)
+              </p>
+              <button id="importAccountsBtn" class="btn btn-secondary">
+                📁 Nhập File Tài khoản
+              </button>
+              <textarea
+                id="accountsInput"
+                placeholder="email1|password1|secret1&#10;email2|password2|secret2"
+              ></textarea>
+              <div class="info">
+                <span id="accountsCount">0 tài khoản đã tải</span>
+              </div>
             </div>
 
-            <!-- Status Panel -->
-            <div class="panel">
-                <h2>📈 Trạng thái & Nhật ký</h2>
-                <div id="status" class="status-display">
-                    <p>Sẵn sàng để bắt đầu tự động hóa...</p>
+            <!-- Combined Format -->
+            <div
+              id="combinedFormat"
+              class="format-section"
+              style="display: none"
+            >
+              <p>
+                <strong>Định dạng Kết hợp:</strong>
+                email|mật_khẩu|khóa_bí_mật|dữ_liệu_A|dữ_liệu_B|dữ_liệu_C|dữ_liệu_D
+                (mỗi dòng một tài khoản)
+              </p>
+              <div class="combined-controls">
+                <button
+                  id="importCombinedBtn"
+                  class="btn btn-secondary"
+                  style="display: none"
+                >
+                  📁 Nhập File Kết hợp
+                </button>
+                <button id="addAccountBtn" class="btn btn-secondary">
+                  ➕ Thêm Tài khoản Mới
+                </button>
+              </div>
+              <textarea
+                style="display: none"
+                id="combinedInput"
+                placeholder="email1|password1|secret1|dataA1|dataB1|dataC1|dataD1&#10;email2|password2|secret2|dataA2|dataB2|dataC2|dataD2"
+              ></textarea>
+              <div class="info">
+                <span id="combinedCount">0 tài khoản với dữ liệu đã tải</span>
+              </div>
+
+              <!-- Account Selection & Data Editor -->
+              <div
+                id="accountEditor"
+                class="account-editor"
+                style="display: none"
+              >
+                <h4>📝 Chỉnh sửa Dữ liệu Tài khoản</h4>
+                <div class="account-selector">
+                  <label for="accountSelect"
+                    >Chọn Tài khoản để Chỉnh sửa:</label
+                  >
+                  <select id="accountSelect">
+                    <option value="">-- Chọn một tài khoản --</option>
+                  </select>
+                  <button
+                    id="deleteAccountBtn"
+                    class="btn btn-danger btn-small"
+                  >
+                    🗑️ Xóa Tài khoản
+                  </button>
                 </div>
 
-                <!-- Workers Status -->
-                <div class="workers-status">
-                    <h3>👷 Trạng thái Workers</h3>
-                    <div id="workersContainer"></div>
-                </div>
+                <div
+                  id="accountDataForm"
+                  class="account-data-form"
+                  style="display: none"
+                >
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="editEmail">Email:</label>
+                      <input
+                        type="email"
+                        id="editEmail"
+                        placeholder="account@gmail.com"
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="editPassword">Mật khẩu:</label>
+                      <input
+                        type="text"
+                        id="editPassword"
+                        placeholder="mật khẩu"
+                      />
+                    </div>
+                    <div class="form-group">
+                      <label for="editSecretKey">Khóa bí mật:</label>
+                      <input
+                        type="text"
+                        id="editSecretKey"
+                        placeholder="khóa bí mật 2FA"
+                      />
+                    </div>
+                  </div>
 
-                <!-- Logs -->
-                <div class="logs">
-                    <h3>📝 Nhật ký</h3>
-                    <div id="logsContainer"></div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="editDataA">Dữ liệu A:</label>
+                      <textarea
+                        id="editDataA"
+                        rows="3"
+                        placeholder="Dữ liệu cho cột A"
+                      ></textarea>
+                    </div>
+                    <div class="form-group">
+                      <label for="editDataB">Dữ liệu B:</label>
+                      <textarea
+                        id="editDataB"
+                        rows="3"
+                        placeholder="Dữ liệu cho cột B"
+                      ></textarea>
+                    </div>
+                  </div>
+
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="editDataC">Dữ liệu C:</label>
+                      <textarea
+                        id="editDataC"
+                        rows="3"
+                        placeholder="Dữ liệu cho cột C"
+                      ></textarea>
+                    </div>
+                    <div class="form-group">
+                      <label for="editDataD">Dữ liệu D:</label>
+                      <textarea
+                        id="editDataD"
+                        rows="3"
+                        placeholder="Dữ liệu cho cột D"
+                      ></textarea>
+                    </div>
+                  </div>
+
+                  <div class="form-actions">
+                    <button id="saveAccountBtn" class="btn btn-primary">
+                      💾 Lưu Dữ liệu Tài khoản
+                    </button>
+                    <button id="cancelEditBtn" class="btn btn-secondary">
+                      ❌ Hủy
+                    </button>
+                    <button id="importAccountDataBtn" class="btn btn-info">
+                      📁 Nhập Dữ liệu cho Tài khoản này
+                    </button>
+                  </div>
                 </div>
+              </div>
             </div>
+          </div>
+
+          <!-- Data Import (Only for Separated Format) -->
+          <div class="section" id="dataSection">
+            <h3>Dữ liệu cho Cột A, B, C, D (Chia sẻ cho tất cả tài khoản)</h3>
+            <button
+              id="importDataBtn"
+              class="btn btn-secondary"
+              style="display: none"
+            >
+              📁 Nhập File Dữ liệu
+            </button>
+            <div class="data-grid">
+              <div class="data-column">
+                <label>Dữ liệu Cột A:</label>
+                <textarea
+                  id="columnAData"
+                  placeholder="Dữ liệu cho cột A (mỗi dòng một mục)"
+                ></textarea>
+              </div>
+              <div class="data-column">
+                <label>Dữ liệu Cột B:</label>
+                <textarea
+                  id="columnBData"
+                  placeholder="Dữ liệu cho cột B (mỗi dòng một mục)"
+                ></textarea>
+              </div>
+              <div class="data-column">
+                <label>Dữ liệu Cột C:</label>
+                <textarea
+                  id="columnCData"
+                  placeholder="Dữ liệu cho cột C (mỗi dòng một mục)"
+                ></textarea>
+              </div>
+              <div class="data-column">
+                <label>Dữ liệu Cột D:</label>
+                <textarea
+                  id="columnDData"
+                  placeholder="Dữ liệu cho cột D (mỗi dòng một mục)"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Custom Function Settings -->
+          <div class="section">
+            <h3>⚙️ Tùy chỉnh Script</h3>
+            <div class="function-editor">
+              <label for="customSendEmailsFunction"
+                >Hàm gửi Email tùy chỉnh:</label
+              >
+              <div class="function-controls">
+                <button
+                  id="resetFunctionBtn"
+                  class="btn btn-secondary btn-small"
+                >
+                  🔄 Khôi phục mặc định
+                </button>
+                <button id="validateFunctionBtn" class="btn btn-info btn-small">
+                  ✅ Kiểm tra cú pháp
+                </button>
+              </div>
+              <textarea
+                id="customSendEmailsFunction"
+                rows="15"
+                placeholder="Nhập code JavaScript tùy chỉnh cho hàm gửi email..."
+              >
+              </textarea>
+              <div class="function-info">
+                <small
+                  >💡 Tip: Hàm này sẽ được thực thi trong Google Apps Script.
+                  Bạn có thể sửa đổi logic gửi email theo nhu cầu.</small
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- Concurrency Settings -->
+          <div class="section">
+            <h3>⚡ Cài đặt Đồng thời</h3>
+            <label for="concurrentWorkers">Số worker chạy đồng thời:</label>
+            <input
+              type="number"
+              id="concurrentWorkers"
+              value="2"
+              min="1"
+              max="10"
+            />
+            <small>Mỗi worker sẽ xử lý các tài khoản song song</small>
+          </div>
         </div>
+
+        <!-- Control Panel -->
+        <div class="panel">
+          <h2>🎮 Điều khiển</h2>
+          <div class="controls">
+            <button id="startBtn" class="btn btn-primary">
+              ▶️ Bắt đầu Tự động hóa
+            </button>
+            <button id="stopBtn" class="btn btn-danger" disabled>
+              ⏹️ Dừng tất cả Workers
+            </button>
+            <button id="statusBtn" class="btn btn-info">
+              📊 Kiểm tra Trạng thái
+            </button>
+          </div>
+        </div>
+
+        <!-- Status Panel -->
+        <div class="panel">
+          <h2>📈 Trạng thái & Nhật ký</h2>
+          <div id="status" class="status-display">
+            <p>Sẵn sàng để bắt đầu tự động hóa...</p>
+          </div>
+
+          <!-- Workers Status -->
+          <div class="workers-status">
+            <h3>👷 Trạng thái Workers</h3>
+            <div id="workersContainer"></div>
+          </div>
+
+          <!-- Logs -->
+          <div class="logs">
+            <h3>📝 Nhật ký</h3>
+            <div id="logsContainer"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script src="renderer.js"></script>
-</body>
-
+  </body>
 </html>

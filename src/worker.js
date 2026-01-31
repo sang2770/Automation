@@ -88,6 +88,11 @@ function showAuthorizationPopup() {
 
   // Get send emails function
   getSendEmailsFunction() {
+    // Use custom function from config if available, otherwise use default
+    if (this.config && this.config.customSendEmailsFunction && this.config.customSendEmailsFunction.trim()) {
+      return this.config.customSendEmailsFunction;
+    }
+
     return `
 function shareSingleFormToList_GR_v2() {
   var formUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfRXFtxcCgr1xQbKsBahcI8zZ7shwhZ5g1PQeYhBuXWboFQGQ/viewform?usp=dialog";
@@ -326,8 +331,8 @@ function isValidEmail_(email) {
 
       // Open Apps Script
       const extensionsMenuSelector = "#docs-extensions-menu";
-      await page.waitForSelector(extensionsMenuSelector, { timeout: 10000 });
-      await page.click(extensionsMenuSelector);
+      await page.waitForSelector(extensionsMenuSelector, { timeout: 30000 });
+      await page.click(extensionsMenuSelector, { force: true });
       await this.delay(2000);
 
       const [newPage] = await Promise.all([

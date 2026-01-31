@@ -27,7 +27,7 @@ header {
 header h1 {
     font-size: 2.5em;
     margin-bottom: 10px;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 header p {
@@ -45,8 +45,8 @@ header p {
     background: white;
     border-radius: 15px;
     padding: 25px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .panel h2 {
@@ -135,7 +135,8 @@ header p {
 }
 
 /* Form Elements */
-textarea, input {
+textarea,
+input {
     width: 100%;
     padding: 12px;
     border: 2px solid #e2e8f0;
@@ -145,7 +146,8 @@ textarea, input {
     resize: vertical;
 }
 
-textarea:focus, input:focus {
+textarea:focus,
+input:focus {
     outline: none;
     border-color: #4facfe;
     box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
@@ -251,6 +253,53 @@ small {
     margin-top: 20px;
 }
 
+/* Function Editor Styles */
+.function-editor {
+    margin-top: 10px;
+}
+
+.function-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.function-controls .btn-small {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+#customSendEmailsFunction {
+    width: 100%;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 12px;
+    background: #f8f9fa;
+    resize: vertical;
+    min-height: 200px;
+}
+
+#customSendEmailsFunction:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+.function-info {
+    margin-top: 8px;
+    padding: 8px;
+    background: #e3f2fd;
+    border-radius: 4px;
+    border-left: 4px solid #2196f3;
+}
+
+.function-info small {
+    color: #0277bd;
+    font-style: italic;
+}
+
 .log-item {
     background: #2d3748;
     color: #e2e8f0;
@@ -346,7 +395,7 @@ small {
     padding: 8px 12px;
     margin-bottom: 8px;
     border-left: 3px solid #4facfe;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .account-item:last-child {
@@ -631,7 +680,7 @@ small {
     .main-content {
         grid-template-columns: 1fr;
     }
-    
+
     .data-grid {
         grid-template-columns: 1fr;
     }
@@ -641,43 +690,43 @@ small {
     .container {
         padding: 10px;
     }
-    
+
     .panel {
         padding: 20px;
     }
-    
+
     header h1 {
         font-size: 2em;
     }
-    
+
     .controls {
         flex-direction: column;
     }
-    
+
     .btn {
         width: 100%;
         margin-right: 0;
     }
-    
+
     .form-row {
         grid-template-columns: 1fr;
         gap: 15px;
     }
-    
+
     .combined-controls {
         flex-direction: column;
     }
-    
+
     .account-selector {
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
     }
-    
+
     .form-actions {
         flex-direction: column;
     }
-    
+
     .form-actions .btn {
         width: 100%;
     }
@@ -689,6 +738,7 @@ small {
         opacity: 0;
         transform: translateY(20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -711,8 +761,13 @@ small {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Scrollbar styling */

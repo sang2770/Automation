@@ -14,6 +14,10 @@ class AutomationApp {
     // Load config with a slight delay to ensure everything is ready
     setTimeout(() => {
       this.loadConfigData();
+      // Ensure default function is loaded if textarea is empty
+      if (!this.customSendEmailsFunction.value.trim()) {
+        this.customSendEmailsFunction.value = this.getDefaultSendEmailsFunction();
+      }
     }, 100);
   }
 
@@ -35,6 +39,12 @@ class AutomationApp {
     this.autoGenerateBtn = document.getElementById("autoGenerateBtn");
     this.cancelPreviewBtn = document.getElementById("cancelPreviewBtn");
     this.concurrentWorkers = document.getElementById("concurrentWorkers");
+    this.customSendEmailsFunction = document.getElementById("customSendEmailsFunction");
+    this.resetFunctionBtn = document.getElementById("resetFunctionBtn");
+    this.validateFunctionBtn = document.getElementById("validateFunctionBtn");
+    this.customSendEmailsFunction = document.getElementById("customSendEmailsFunction");
+    this.resetFunctionBtn = document.getElementById("resetFunctionBtn");
+    this.validateFunctionBtn = document.getElementById("validateFunctionBtn");
 
     // Format sections
     this.separatedFormat = document.getElementById("separatedFormat");
@@ -95,6 +105,11 @@ class AutomationApp {
       this.importDataForSelectedAccount(),
     );
 
+    // Function editor handlers
+    this.resetFunctionBtn.addEventListener("click", () => this.resetFunction());
+    this.validateFunctionBtn.addEventListener("click", () => this.validateFunction());
+    this.customSendEmailsFunction.addEventListener("input", () => this.debouncedSave());
+
     // Account management handlers
     this.addAccountBtn.addEventListener("click", () => this.addNewAccount());
     this.accountSelect.addEventListener("change", () =>
@@ -107,6 +122,11 @@ class AutomationApp {
     this.deleteAccountBtn.addEventListener("click", () =>
       this.deleteSelectedAccount(),
     );
+
+    // Function editor handlers
+    this.resetFunctionBtn.addEventListener("click", () => this.resetFunction());
+    this.validateFunctionBtn.addEventListener("click", () => this.validateFunction());
+    this.customSendEmailsFunction.addEventListener("input", () => this.debouncedSave());
     // Control handlers
     this.startBtn.addEventListener("click", () => this.startAutomation());
     this.stopBtn.addEventListener("click", () => this.stopAutomation());
@@ -161,19 +181,19 @@ class AutomationApp {
             secretKey: acc.secretKey || "",
             data: acc.data
               ? {
-                  A: Array.isArray(acc.data.A)
-                    ? acc.data.A
-                    : [acc.data.A].filter((x) => x),
-                  B: Array.isArray(acc.data.B)
-                    ? acc.data.B
-                    : [acc.data.B].filter((x) => x),
-                  C: Array.isArray(acc.data.C)
-                    ? acc.data.C
-                    : [acc.data.C].filter((x) => x),
-                  D: Array.isArray(acc.data.D)
-                    ? acc.data.D
-                    : [acc.data.D].filter((x) => x),
-                }
+                A: Array.isArray(acc.data.A)
+                  ? acc.data.A
+                  : [acc.data.A].filter((x) => x),
+                B: Array.isArray(acc.data.B)
+                  ? acc.data.B
+                  : [acc.data.B].filter((x) => x),
+                C: Array.isArray(acc.data.C)
+                  ? acc.data.C
+                  : [acc.data.C].filter((x) => x),
+                D: Array.isArray(acc.data.D)
+                  ? acc.data.D
+                  : [acc.data.D].filter((x) => x),
+              }
               : null,
           }));
           this.updateAccountsTextarea();
@@ -206,6 +226,15 @@ class AutomationApp {
           if (config.automation.inputFormat) {
             this.inputFormat = config.automation.inputFormat;
           }
+          if (config.automation.customSendEmailsFunction) {
+            this.customSendEmailsFunction.value = config.automation.customSendEmailsFunction;
+          } else {
+            // Load default function if no custom function is saved
+            this.customSendEmailsFunction.value = this.getDefaultSendEmailsFunction();
+          }
+        } else {
+          // Load default function if no config.automation exists
+          this.customSendEmailsFunction.value = this.getDefaultSendEmailsFunction();
         }
 
         // Set the correct format radio button and update UI
@@ -253,11 +282,11 @@ class AutomationApp {
           data:
             this.inputFormat === "combined" && acc.data
               ? {
-                  A: Array.isArray(acc.data.A) ? acc.data.A : [],
-                  B: Array.isArray(acc.data.B) ? acc.data.B : [],
-                  C: Array.isArray(acc.data.C) ? acc.data.C : [],
-                  D: Array.isArray(acc.data.D) ? acc.data.D : [],
-                }
+                A: Array.isArray(acc.data.A) ? acc.data.A : [],
+                B: Array.isArray(acc.data.B) ? acc.data.B : [],
+                C: Array.isArray(acc.data.C) ? acc.data.C : [],
+                D: Array.isArray(acc.data.D) ? acc.data.D : [],
+              }
               : null,
         }));
 
@@ -281,6 +310,7 @@ class AutomationApp {
       await window.electronAPI.updateConfig("automation", {
         concurrent: parseInt(this.concurrentWorkers.value) || 1,
         inputFormat: this.inputFormat,
+        customSendEmailsFunction: this.customSendEmailsFunction.value.trim() || this.getDefaultSendEmailsFunction(),
       });
 
       this.addLog("💾 Current state saved to config", "success");
@@ -300,6 +330,11 @@ class AutomationApp {
   }
 
   loadDefaultData() {
+    // Load default function
+    if (this.customSendEmailsFunction) {
+      this.customSendEmailsFunction.value = this.getDefaultSendEmailsFunction();
+    }
+
     // Load default data from the original main.js
     const defaultDataA = [
       "nattaponglum@gmail.com",
@@ -820,6 +855,7 @@ class AutomationApp {
         data: this.inputFormat === "separated" ? this.data : null, // Global data only for separated format
         concurrent,
         inputFormat: this.inputFormat,
+        customSendEmailsFunction: this.customSendEmailsFunction.value.trim() || this.getDefaultSendEmailsFunction(),
       };
 
       const result = await window.electronAPI.startAutomation(config);
@@ -940,6 +976,140 @@ class AutomationApp {
     while (this.logsContainer.children.length > 100) {
       this.logsContainer.removeChild(this.logsContainer.firstChild);
     }
+  }
+
+  // Function editor methods
+  resetFunction() {
+    const defaultFunction = this.getDefaultSendEmailsFunction();
+    this.customSendEmailsFunction.value = defaultFunction;
+    this.debouncedSave();
+    this.addLog("\ud83d\udd04 Kh\u00f4i ph\u1ee5c h\u00e0m m\u1eb7c \u0111\u1ecbnh th\u00e0nh c\u00f4ng", "info");
+  }
+
+  validateFunction() {
+    const code = this.customSendEmailsFunction.value.trim();
+    if (!code) {
+      this.addLog("\u26a0\ufe0f Vui l\u00f2ng nh\u1eadp code tr\u01b0\u1edbc khi ki\u1ec3m tra", "error");
+      return;
+    }
+
+    try {
+      // Basic syntax check - try to create a function
+      new Function(code);
+      this.addLog("\u2705 C\u00fa ph\u00e1p h\u1ee3p l\u1ec7! C\u00f3 th\u1ec3 s\u1eed d\u1ee5ng function n\u00e0y.", "success");
+    } catch (error) {
+      this.addLog(`\u274c L\u1ed7i c\u00fa ph\u00e1p: ${error.message}`, "error");
+    }
+  }
+
+  getDefaultSendEmailsFunction() {
+    return `function shareSingleFormToList_GR_v2() {
+  var formUrl = "https://docs.google.com/forms/d/e/1FAIpQLSfRXFtxcCgr1xQbKsBahcI8zZ7shwhZ5g1PQeYhBuXWboFQGQ/viewform?usp=dialog";
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Sheet1") || ss.getSheetByName("Hoja 1");
+  
+  if (!sheet) {
+    throw new Error("Kh\u00f4ng t\u00ecm th\u1ea5y Sheet 1 ho\u1eb7c Hoja 1");
+  }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  var values = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+  var senderName = "Meta Verified";
+  var replyAddress = Session.getActiveUser().getEmail();
+
+  var subjectVariants = [
+    "Meta Blue\u306e\u691c\u8a3c\u30b9\u30c6\u30fc\u30bf\u30b9",
+    "\u5fc5\u8981\u306a\u64cd\u4f5c: \u30e1\u30bf\u30c7\u30fc\u30bf\u691c\u8a3c",
+    "\u691c\u8a3c\u30bb\u30f3\u30bf\u30fc\u901a\u77e5",
+    "Meta\u30a2\u30ab\u30a6\u30f3\u30c8\u8a8d\u8a3c\u306e\u66f4\u65b0",
+    "\u30a2\u30ab\u30a6\u30f3\u30c8\u60c5\u5831",
+    "\u30a2\u30ab\u30a6\u30f3\u30c8\u901a\u77e5",
+    "\u30a2\u30ab\u30a6\u30f3\u30c8\u306e\u8a73\u7d30",
+    "Meta \u30a2\u30ab\u30a6\u30f3\u30c8\u3092\u66f4\u65b0\u3057\u307e\u3059\u3002",
+    "\u30a2\u30ab\u30a6\u30f3\u30c8\u306e\u30b9\u30c6\u30fc\u30bf\u30b9",
+    "\u91cd\u8981\u306a\u30a2\u30ab\u30a6\u30f3\u30c8\u901a\u77e5\u3002",
+    "Meta\u304b\u3089\u306e\u901a\u77e5\u3002",
+    "Meta\u30a2\u30ab\u30a6\u30f3\u30c8\u8a8d\u8a3c",
+    "\u30a2\u30ab\u30a6\u30f3\u30c8\u78ba\u8a8d\u60c5\u5831"
+  ];
+
+  var openingPool = [];
+  var closingPool = [];
+
+  for (var i = 0; i < values.length; i++) {
+    if (values[i][2]) openingPool.push(values[i][2].toString());
+    if (values[i][3]) closingPool.push(values[i][3].toString());
+  }
+
+  if (openingPool.length === 0 || closingPool.length === 0) {
+    throw new Error("C\u1ed9t C ho\u1eb7c D kh\u00f4ng c\u00f3 n\u1ed9i dung \u0111\u1ec3 random");
+  }
+
+  var MAX_PER_RUN = 200;
+  var sentCount = 0;
+  var quota = MailApp.getRemainingDailyQuota();
+  
+  if (quota <= 0) return;
+  var hardLimit = Math.min(MAX_PER_RUN, quota);
+
+  for (var i = 0; i < values.length; i++) {
+    if (sentCount >= hardLimit) break;
+
+    var rowIndex = i + 2;
+    var email = (values[i][0] || "").toString().trim();
+    var pageName = (values[i][1] || "").toString().trim();
+
+    if (!email) continue;
+
+    var status = String(sheet.getRange(rowIndex, 5).getValue() || "").toLowerCase();
+    if (status === "\u2705 sent") continue;
+
+    if (!isValidEmail_(email)) {
+      sheet.getRange(rowIndex, 5).setValue("invalid");
+      sheet.getRange(rowIndex, 6).setValue(new Date());
+      continue;
+    }
+
+    var opening = openingPool[Math.floor(Math.random() * openingPool.length)];
+    var closing = closingPool[Math.floor(Math.random() * closingPool.length)];
+
+    opening = opening.replace(/\\[name\\]/gi, pageName || "");
+    closing = closing.replace(/\\[name\\]/gi, pageName || "");
+
+    var fullBody = "Dear " + (pageName || "User") + ",\\\\n\\\\n" + opening + "\\\\n\\\\n" + formUrl + "\\\\n\\\\n" + closing;
+    var subject = subjectVariants[i % subjectVariants.length];
+
+    try {
+      MailApp.sendEmail({
+        to: email,
+        subject: subject,
+        body: fullBody,
+        name: senderName,
+        replyTo: replyAddress
+      });
+
+      Logger.log(rowIndex + " | " + email + " | \u2705 Sent");
+      sheet.getRange(rowIndex, 5).setValue("\u2705 Sent");
+      sheet.getRange(rowIndex, 6).setValue(new Date());
+      sentCount++;
+      Utilities.sleep(18000);
+
+    } catch (e) {
+      Logger.log(rowIndex + " | " + email + " | \u274c ERROR - STOP");
+      sheet.getRange(rowIndex, 5).setValue("\u274c Error");
+      sheet.getRange(rowIndex, 6).setValue(new Date());
+      throw e;
+    }
+  }
+
+  SpreadsheetApp.flush();
+}
+
+function isValidEmail_(email) {
+  return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/i.test(email);
+}`;
   }
 }
 
