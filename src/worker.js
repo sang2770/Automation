@@ -455,6 +455,7 @@ function isValidEmail_(email) {
         }
         while (attempts < maxAttempts) {
           if (checkDialog()) {
+            console.log("Found!");
             break;
           }
           await new Promise(res => setTimeout(res, 2000));
@@ -464,6 +465,7 @@ function isValidEmail_(email) {
           .querySelector("[role='dialog']")
           .querySelectorAll("button")[1]
           .click();
+        console.log("Clicked authorize button: ", document.querySelector("[role='dialog']").querySelectorAll("button")[1]);
       });
 
       const [reviewPermissionsPage] = await Promise.all([
