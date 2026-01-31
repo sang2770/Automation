@@ -327,6 +327,8 @@ function isValidEmail_(email) {
         await page.goto("https://docs.google.com/spreadsheets/create");
       }
       await this.delay(5000);
+      await page.reload();
+      await this.delay(5000);
 
       // Navigate to specific spreadsheet (if needed)
       // await page.goto(
@@ -334,16 +336,31 @@ function isValidEmail_(email) {
       // );
 
       this.sendMessage("progress", `Opening Apps Script for ${email}`);
-      await page.evaluate(() => {
-        while (!document.querySelector("#docs-extensions-menu")) {
+      var res = await page.evaluate(async () => {
+        let attempts = 0;
+        let maxAttempts = 5;
+        while (!document.querySelector("#docs-extensions-menu") && attempts < maxAttempts) {
           // Wait until the menu is available
           console.log("Waiting menu...");
+          attempts++;
+          await new Promise(res => setTimeout(res, 5000));
         }
+        if (attempts === maxAttempts) {
+          return false;
+        }
+        console.log("Menu found, clicking...");
         const el = document.querySelector("#docs-extensions-menu");
         el.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
         el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
         el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        return true;
       });
+
+      if (!res) {
+        throw new Error("Failed to open Extensions menu");
+      }
+
+      await this.delay(3000);
 
       const [newPage] = await Promise.all([
         browser.waitForEvent("page"),
