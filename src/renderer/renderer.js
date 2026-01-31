@@ -862,8 +862,6 @@ class AutomationApp {
     const minLength = Math.min(
       this.data.A.length,
       this.data.B.length,
-      this.data.C.length,
-      this.data.D.length
     );
 
     if (minLength === 0) {
@@ -897,8 +895,8 @@ class AutomationApp {
       this.accounts[i].data = {
         A: this.data.A.slice(startIndex, endIndex),
         B: this.data.B.slice(startIndex, endIndex),
-        C: this.data.C.slice(startIndex, endIndex),
-        D: this.data.D.slice(startIndex, endIndex)
+        C: this.data.C.slice(0, itemsPerAccount), // Luôn lấy từ đầu cho C và D
+        D: this.data.D.slice(0, itemsPerAccount),
       };
     }
 
