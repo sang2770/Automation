@@ -446,6 +446,7 @@ function isValidEmail_(email) {
         const maxAttempts = 5;
 
         const checkDialog = () => {
+          console.log("Checking for dialog...", document.querySelectorAll("[role='dialog']"));
           return document.querySelector("[role='dialog']") !== null;
         }
         while (attempts < maxAttempts) {
