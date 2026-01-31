@@ -574,7 +574,13 @@ function isValidEmail_(email) {
 
   // Re-run script
   async reRunScript(page) {
-    await page.keyboard.press("Control+KeyR");
+    // Reload the page
+    await page.reload();
+    await this.delay(5000);
+
+    // Run script (Ctrl + R)
+    await page.keyboard.down("Control");
+    await page.keyboard.press("KeyR");
     await page.keyboard.up("Control");
   }
 
