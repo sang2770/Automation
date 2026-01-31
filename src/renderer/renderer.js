@@ -9,6 +9,10 @@ class AutomationApp {
     this.inputFormat = "separated"; // 'separated' or 'combined'
     this.saveTimeout = null; // For debouncing auto-save
     this.usedDataIndexes = { A: [], B: [] }; // Track used data indexes for cleanup
+    this.accountResults = {
+      success: [],
+      failed: []
+    };
 
     this.initializeElements();
     this.setupEventListeners();
@@ -81,6 +85,17 @@ class AutomationApp {
     this.workersContainer = document.getElementById("workersContainer");
     this.logsContainer = document.getElementById("logsContainer");
 
+    // Results elements
+    this.successCount = document.getElementById("successCount");
+    this.failedCount = document.getElementById("failedCount");
+    this.totalCount = document.getElementById("totalCount");
+    this.successTab = document.getElementById("successTab");
+    this.failedTab = document.getElementById("failedTab");
+    this.successAccountsList = document.getElementById("successAccountsList");
+    this.failedAccountsList = document.getElementById("failedAccountsList");
+    this.successAccounts = document.getElementById("successAccounts");
+    this.failedAccounts = document.getElementById("failedAccounts");
+
     // Format radio buttons
     this.formatRadios = document.getElementsByName("inputFormat");
 
@@ -134,6 +149,10 @@ class AutomationApp {
     this.startBtn.addEventListener("click", () => this.startAutomation());
     this.stopBtn.addEventListener("click", () => this.stopAutomation());
     this.statusBtn.addEventListener("click", () => this.checkStatus());
+
+    // Results tab handlers
+    this.successTab.addEventListener("click", () => this.showResultsTab("success"));
+    this.failedTab.addEventListener("click", () => this.showResultsTab("failed"));
 
     // Input change handlers
     this.accountsInput.addEventListener("input", () => this.parseAccounts());
@@ -954,6 +973,9 @@ class AutomationApp {
       return;
     }
 
+    // Clear previous results
+    this.clearResults();
+
     const concurrent = parseInt(this.concurrentWorkers.value) || 2;
 
     // Save current state before starting
@@ -1059,7 +1081,7 @@ class AutomationApp {
   }
 
   handleWorkerUpdate(data) {
-    const { workerId, type, message, progress } = data;
+    const { workerId, type, message, progress, accountData } = data;
     const workerName = `Worker ${workerId.substring(0, 8)}`;
 
     switch (type) {
@@ -1068,9 +1090,17 @@ class AutomationApp {
         break;
       case "success":
         this.addLog(`✅ ${workerName}: ${message}`, "success");
+        // Thêm tài khoản vào danh sách thành công
+        if (accountData) {
+          this.addAccountResult("success", accountData, message);
+        }
         break;
       case "error":
         this.addLog(`❌ ${workerName}: ${message}`, "error");
+        // Thêm tài khoản vào danh sách lỗi
+        if (accountData) {
+          this.addAccountResult("failed", accountData, message);
+        }
         break;
       case "completed":
         this.addLog(`🎉 ${workerName}: Completed`, "success");
@@ -1129,6 +1159,73 @@ class AutomationApp {
     } catch (error) {
       this.addLog(`\u274c L\u1ed7i c\u00fa ph\u00e1p: ${error.message}`, "error");
     }
+  }
+
+  // Results management methods
+  addAccountResult(type, accountData, message) {
+    const timestamp = new Date().toLocaleString();
+    const result = {
+      email: accountData.email || "N/A",
+      message: message,
+      timestamp: timestamp,
+      accountData: accountData
+    };
+
+    if (type === "success") {
+      this.accountResults.success.push(result);
+    } else if (type === "failed") {
+      this.accountResults.failed.push(result);
+    }
+
+    this.updateResultsDisplay();
+  }
+
+  updateResultsDisplay() {
+    // Update counters
+    this.successCount.textContent = this.accountResults.success.length;
+    this.failedCount.textContent = this.accountResults.failed.length;
+    this.totalCount.textContent = this.accountResults.success.length + this.accountResults.failed.length;
+
+    // Update lists
+    this.updateAccountsList("success", this.accountResults.success);
+    this.updateAccountsList("failed", this.accountResults.failed);
+  }
+
+  updateAccountsList(type, accounts) {
+    const container = type === "success" ? this.successAccounts : this.failedAccounts;
+
+    if (accounts.length === 0) {
+      container.innerHTML = `<p class="no-data">Chưa có tài khoản nào ${type === "success" ? "được xử lý thành công" : "bị lỗi"}.</p>`;
+      return;
+    }
+
+    const html = accounts.map((account, index) => `
+      <div class="account-result-item ${type}">
+        <div class="account-info">
+          <span class="email">${account.email}</span>
+          <span class="timestamp">${account.timestamp}</span>
+        </div>
+        <div class="message">${account.message}</div>
+      </div>
+    `).join("");
+
+    container.innerHTML = html;
+  }
+
+  showResultsTab(tabType) {
+    // Update tab buttons
+    this.successTab.classList.toggle("active", tabType === "success");
+    this.failedTab.classList.toggle("active", tabType === "failed");
+
+    // Show/hide lists
+    this.successAccountsList.style.display = tabType === "success" ? "block" : "none";
+    this.failedAccountsList.style.display = tabType === "failed" ? "block" : "none";
+  }
+
+  clearResults() {
+    this.accountResults.success = [];
+    this.accountResults.failed = [];
+    this.updateResultsDisplay();
   }
 
   getDefaultSendEmailsFunction() {

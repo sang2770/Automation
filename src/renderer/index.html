@@ -327,6 +327,51 @@
             <div id="logsContainer"></div>
           </div>
         </div>
+
+        <!-- Account Results Panel -->
+        <div class="panel">
+          <h2>📋 Kết quả Xử lý Tài khoản</h2>
+
+          <div class="results-summary">
+            <div class="summary-card success">
+              <h3>✅ Thành công</h3>
+              <div class="count" id="successCount">0</div>
+            </div>
+            <div class="summary-card failed">
+              <h3>❌ Lỗi</h3>
+              <div class="count" id="failedCount">0</div>
+            </div>
+            <div class="summary-card total">
+              <h3>📊 Tổng cộng</h3>
+              <div class="count" id="totalCount">0</div>
+            </div>
+          </div>
+
+          <div class="results-tabs">
+            <button id="successTab" class="tab-btn active">
+              ✅ Tài khoản thành công
+            </button>
+            <button id="failedTab" class="tab-btn">❌ Tài khoản lỗi</button>
+          </div>
+
+          <div id="successAccountsList" class="accounts-list">
+            <div class="accounts-container" id="successAccounts">
+              <p class="no-data">
+                Chưa có tài khoản nào được xử lý thành công.
+              </p>
+            </div>
+          </div>
+
+          <div
+            id="failedAccountsList"
+            class="accounts-list"
+            style="display: none"
+          >
+            <div class="accounts-container" id="failedAccounts">
+              <p class="no-data">Chưa có tài khoản nào bị lỗi.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 

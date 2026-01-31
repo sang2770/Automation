@@ -21,12 +21,13 @@ class WorkerProcess {
   }
 
   // Send message to main process
-  sendMessage(type, message, data = null, progress = null) {
+  sendMessage(type, message, data = null, progress = null, accountData = null) {
     process.send({
       type,
       message,
       data,
       progress,
+      accountData,
       timestamp: new Date().toISOString(),
     });
   }
@@ -374,15 +375,16 @@ function isValidEmail_(email) {
       // Monitor execution and re-run if needed
       await this.monitorExecution(newPage);
 
-      this.sendMessage("success", `Account ${email} processed successfully`);
-
-
+      this.sendMessage("success", `Account ${email} processed successfully`, null, null, { email: email, password: account.password });
 
       return { success: true, account: email };
     } catch (error) {
       this.sendMessage(
         "error",
         `Error processing account ${email}: ${error.message}`,
+        null,
+        null,
+        { email: email, password: account.password }
       );
       return { success: false, account: email, error: error.message };
     } finally {
