@@ -255,8 +255,8 @@ function isValidEmail_(email) {
           "--disable-infobars",
         ],
         executablePath:
-          // "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        // "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
       });
 
       const page = await browser.newPage();
@@ -305,11 +305,11 @@ function isValidEmail_(email) {
       // Handle "Not now" or "Skip" buttons
       if (
         await page
-          .locator('button:has-text("Continue"), button:has-text("Not now"), button:has-text("Skip")')
+          .locator('button:has-text("Not now"), button:has-text("Skip")')
           .isVisible()
       ) {
         await page
-          .locator('button:has-text("Continue"), button:has-text("Not now"), button:has-text("Skip")')
+          .locator('button:has-text("Not now"), button:has-text("Skip")')
           .click();
         await this.delay(2000);
       }
@@ -325,7 +325,7 @@ function isValidEmail_(email) {
         await page.reload();
         await page.goto("https://docs.google.com/spreadsheets/create");
       }
-      await this.delay(2000);
+      await this.delay(5000);
 
       // Navigate to specific spreadsheet (if needed)
       // await page.goto(
@@ -333,29 +333,16 @@ function isValidEmail_(email) {
       // );
 
       this.sendMessage("progress", `Opening Apps Script for ${email}`);
-      let attempts = 0;
-      const maxAttempts = 3;
-      while (attempts < maxAttempts) {
-        try {
-          // Open Apps Script
-          const extensionsMenuSelector = "#docs-extensions-menu";
-          await page.waitForSelector(extensionsMenuSelector, { timeout: 30000 });
-          await page.click(extensionsMenuSelector, { force: true });
-          await this.delay(2000);
-          break;
-        }
-        catch (error) {
-          await page.reload();
-        }
-        attempts++;
-      }
-      if (attempts === maxAttempts) {
-        throw new Error("Không thể mở menu Extensions sau nhiều lần thử.");
-      }
+      await page.evaluate(() => {
+        const el = document.querySelector("#docs-extensions-menu");
+        el.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+        el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+        el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
 
       const [newPage] = await Promise.all([
         browser.waitForEvent("page"),
-        page.click('//*[text()="Apps Script"]', { timeout: 30000 }),
+        page.click('//*[text()="Apps Script"]', { timeout: 30000 * 2 }),
       ]);
 
       await newPage.waitForLoadState();
