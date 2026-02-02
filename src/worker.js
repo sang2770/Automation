@@ -349,6 +349,12 @@ function isValidEmail_(email) {
           return false;
         }
         console.log("Menu found, clicking...");
+        const el_test = document.querySelector("#docs-insert-menu");
+        el_test.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+        el_test.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+        el_test.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        await new Promise(res => setTimeout(res, 2000));
+
         const el = document.querySelector("#docs-extensions-menu");
         el.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
         el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
@@ -696,8 +702,18 @@ function isValidEmail_(email) {
     this.sendMessage("progress", "Worker stopping...");
 
     if (this.browser) {
-      this.browser.close().catch(console.error);
+      this.browser.close().then(() => {
+        this.sendMessage("progress", "Browser closed successfully");
+      }).catch((error) => {
+        this.sendMessage("error", `Error closing browser: ${error.message}`);
+      });
     }
+
+    // Force exit after a timeout
+    setTimeout(() => {
+      this.sendMessage("progress", "Force terminating worker process");
+      process.exit(0);
+    }, 5000);
   }
 }
 

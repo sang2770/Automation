@@ -225,15 +225,19 @@ class ElectronApp {
 
           if (workerAccounts.length > 0) {
             const workerId = uuidv4();
-            const workerPromise = this.startWorker(workerId, {
-              accounts: workerAccounts,
-              data,
-              inputFormat,
-              customSendEmailsFunction: config.customSendEmailsFunction,
-              workerIndex: i,
-            });
+            try {
+              const workerPromise = this.startWorker(workerId, {
+                accounts: workerAccounts,
+                data,
+                inputFormat,
+                customSendEmailsFunction: config.customSendEmailsFunction,
+                workerIndex: i,
+              });
 
-            workerPromises.push(workerPromise);
+              workerPromises.push(workerPromise);
+            } catch (error) {
+              console.error(`Error starting worker ${workerId}:`, error);
+            }
           }
         }
 
