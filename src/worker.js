@@ -481,7 +481,7 @@ function isValidEmail_(email) {
             console.log("Found!");
             break;
           }
-          await new Promise(res => setTimeout(res, 2000));
+          await new Promise(res => setTimeout(res, Math.random() * 3000 + 2000));
           attempts++;
         }
         document
