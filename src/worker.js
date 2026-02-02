@@ -484,11 +484,15 @@ function isValidEmail_(email) {
           await new Promise(res => setTimeout(res, Math.random() * 3000 + 2000));
           attempts++;
         }
-        document
+        const btn = document
           .querySelector("[role='dialog']")
           .querySelectorAll("button")[1]
-          .click();
-        console.log("Clicked authorize button: ", document.querySelector("[role='dialog']").querySelectorAll("button")[1]);
+          ;
+        btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+        btn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+        btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+        console.log("Clicked authorize button: ", btn);
       });
 
       const [reviewPermissionsPage] = await Promise.all([
