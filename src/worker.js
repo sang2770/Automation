@@ -470,7 +470,7 @@ function isValidEmail_(email) {
       await this.delay(10000);
       await newPage.evaluate(async () => {
         let attempts = 0;
-        const maxAttempts = 5;
+        const maxAttempts = 10;
 
         const checkDialog = () => {
           console.log("Checking for dialog...", document.querySelectorAll("[role='dialog']"));
