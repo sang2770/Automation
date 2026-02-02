@@ -468,32 +468,39 @@ function isValidEmail_(email) {
   async handlePermissionAuthorization(browser, newPage, secretKey) {
     try {
       await this.delay(10000);
-      await newPage.evaluate(async () => {
-        let attempts = 0;
-        const maxAttempts = 10;
+      try {
+        await newPage.click('text=Review Permissions', { timeout: 15000 });
+        console.log("Clicked Review Permissions button");
+      } catch {
+        await newPage.evaluate(async () => {
+          let attempts = 0;
+          const maxAttempts = 10;
 
-        const checkDialog = () => {
-          console.log("Checking for dialog...", document.querySelectorAll("[role='dialog']"));
-          return document.querySelector("[role='dialog']") !== null;
-        }
-        while (attempts < maxAttempts) {
-          if (checkDialog()) {
-            console.log("Found!");
-            break;
+          const checkDialog = () => {
+            console.log("Checking for dialog...", document.querySelectorAll("[role='dialog']"));
+            return document.querySelector("[role='dialog']") !== null;
           }
-          await new Promise(res => setTimeout(res, Math.random() * 3000 + 2000));
-          attempts++;
-        }
-        const btn = document
-          .querySelector("[role='dialog']")
-          .querySelectorAll("button")[1]
-          ;
-        btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-        btn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-        btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          while (attempts < maxAttempts) {
+            if (checkDialog()) {
+              console.log("Found!");
+              break;
+            }
+            await new Promise(res => setTimeout(res, Math.random() * 3000 + 2000));
+            attempts++;
+          }
+          await new Promise(res => setTimeout(res, 5000));
+          const btn = document
+            .querySelector("[role='dialog']")
+            .querySelectorAll("button")[1]
+            ;
+          btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+          btn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+          btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-        console.log("Clicked authorize button: ", btn);
-      });
+          console.log("Đã nhấn nút ủy quyền: ", btn);
+        });
+      }
+
 
       const [reviewPermissionsPage] = await Promise.all([
         browser.waitForEvent("page"),
