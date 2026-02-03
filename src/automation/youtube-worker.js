@@ -380,7 +380,7 @@ class YouTubeWorker {
       if (this.createdProfileId) {
         const response = await axios.get(
           `${baseGPMAPIUrl}/api/v3/profiles/delete/${this.createdProfileId}?mode=2`,
-          { timeout: 10000 },
+          { timeout: 120000 },
         );
 
         if (response.data.success) {
@@ -440,6 +440,8 @@ class YouTubeWorker {
       baseUrl += `?win_size=${windowWidth},${windowHeight}`;
       baseUrl += `&win_pos=${windowX},${windowY}`;
 
+      baseUrl += `&mute_audio=true`;
+
       const response = await axios.get(baseUrl, { timeout: 120000 });
 
       if (!response.data.success) {
@@ -448,8 +450,6 @@ class YouTubeWorker {
       }
 
       this.debugPort = response.data.data.remote_debugging_address;
-
-      const gridInfo = this.getGridInfo();
       this.parent.sendMessage("automation-progress", {
         message: `Worker ${this.workerId}: Started GPMLogin profile ${this.profileId}`,
       });
