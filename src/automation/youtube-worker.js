@@ -860,7 +860,7 @@ class YouTubeWorker {
       }
 
       if (adFound) {
-          await this.clickOnAdView(adElement);
+        await this.clickOnAdView(adElement);
       } else if (!adFound) {
         this.parent.sendMessage("automation-progress", {
           message: `Worker ${this.workerId}: No ads detected within ${maxWaitTime}ms`,
@@ -970,7 +970,7 @@ class YouTubeWorker {
         });
       } else {
         // Wait after clicking ad to allow page navigation/popup
-        await this.delay(3000);
+        await this.delay(10000);
 
         // Handle potential new tab/popup
         await this.handleAdPopup();
