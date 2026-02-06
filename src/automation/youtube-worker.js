@@ -28,7 +28,7 @@ class AutomationWorker {
     // Calculate total tasks from all enabled links
     const enabledLinks = config.links.filter((link) => link.enabled);
     const totalViews = enabledLinks.reduce((sum, link) => sum + link.views, 0);
-
+    const delayBetweenTasks = config.settings.delayBetweenActions || 1000;
     this.stats = {
       total: totalViews,
       completed: 0,
@@ -107,16 +107,16 @@ class AutomationWorker {
               `Worker ${workerId} error processing task ${task.taskId}:`,
               error,
             );
-            this.stats.failed++;
-
             const gridPos = worker.calculateGridPosition(workerId);
             this.sendMessage("automation-progress", {
               message: `${gridPos.gridInfo}: Failed task ${task.taskId} - ${error.message}`,
             });
+            throw error;
           }
-
           this.stats.completed++;
           // Note: Update message will be sent in taskPromise.finally() to avoid duplication
+        } catch (error) {
+          this.stats.failed++;
         } finally {
           await worker.cleanup();
           // Remove worker from array after cleanup
@@ -151,17 +151,24 @@ class AutomationWorker {
           });
 
           // Start the task
-          const taskPromise = processTask(currentTask, workerId).finally(() => {
-            runningTasks.delete(taskPromise);
-            // Update running count after task completion
-            this.sendMessage("automation-update", {
-              completed: this.stats.completed,
-              total: this.stats.total,
-              running: runningTasks.size,
-              failed: this.stats.failed,
-              progress: this.stats.completed / this.stats.total,
+          const taskPromise = processTask(currentTask, workerId)
+            .catch((e) => {
+              console.error(`Error processing task ${currentTask.taskId}:`, e);
+              this.sendMessage("automation-progress", {
+                message: `Error processing task ${currentTask.taskId}: ${e.message}`,
+              });
+            })
+            .finally(() => {
+              runningTasks.delete(taskPromise);
+              // Update running count after task completion
+              this.sendMessage("automation-update", {
+                completed: this.stats.completed,
+                total: this.stats.total,
+                running: runningTasks.size,
+                failed: this.stats.failed,
+                progress: this.stats.completed / this.stats.total,
+              });
             });
-          });
 
           runningTasks.add(taskPromise);
 
@@ -176,7 +183,7 @@ class AutomationWorker {
 
           // Add delay between starting tasks
           if (this.isRunning && taskIndex < tasks.length) {
-            await this.delay(1000 + Math.random() * 1000);
+            await this.delay(delayBetweenTasks);
           }
         }
 
@@ -646,7 +653,7 @@ class YouTubeWorker {
         });
         await searchBox.click();
         await this.humanType(searchBox, randomKeyword);
-
+        await this.delay(2000);
         // Submit search
         await searchBox.press("Enter");
 
@@ -669,7 +676,7 @@ class YouTubeWorker {
         const relatedVideo = await this.scrollUntil(
           'yt-lockup-view-model a[href*="watch"]',
         );
-
+        await this.delay(2000);
         if (!relatedVideo) {
           this.parent.sendMessage("automation-progress", {
             message: `Worker ${this.workerId}: No related video → direct`,
@@ -732,6 +739,7 @@ class YouTubeWorker {
 
   async navigateToTargetVideo(targetUrl, replaceableVideo = null) {
     try {
+      await this.delay(2000);
       /* ===============================
          CASE 1: CÓ VIDEO CÓ THỂ REPLACE
       ================================ */
