@@ -383,27 +383,33 @@ class YouTubeWorker {
   }
 
   async deleteProfile() {
-    try {
-      if (this.createdProfileId) {
-        const response = await axios.get(
-          `${baseGPMAPIUrl}/api/v3/profiles/delete/${this.createdProfileId}?mode=2`,
-          { timeout: 120000 },
-        );
+    let retryCount = 0;
+    const maxRetries = 3;
+    while (retryCount < maxRetries) {
+      try {
+        if (this.createdProfileId) {
+          const response = await axios.get(
+            `${baseGPMAPIUrl}/api/v3/profiles/delete/${this.createdProfileId}?mode=2`,
+            { timeout: 120000 },
+          );
 
-        if (response.data.success) {
-          this.parent.sendMessage("automation-progress", {
-            message: `Worker ${this.workerId}: Deleted GPM profile ${this.createdProfileId}`,
-          });
-        } else {
-          this.parent.sendMessage("automation-progress", {
-            message: `Worker ${this.workerId}: Failed to delete profile: ${response.data.message}`,
-          });
+          if (response.data.success) {
+            this.parent.sendMessage("automation-progress", {
+              message: `Worker ${this.workerId}: Deleted GPM profile ${this.createdProfileId}`,
+            });
+          } else {
+            this.parent.sendMessage("automation-progress", {
+              message: `Worker ${this.workerId}: Failed to delete profile: ${response.data.message}`,
+            });
+          }
+          break; // Exit loop on success
         }
+      } catch (error) {
+        this.parent.sendMessage("automation-progress", {
+          message: `Worker ${this.workerId}: Error deleting GPM profile: ${error.message}`,
+        });
       }
-    } catch (error) {
-      this.parent.sendMessage("automation-progress", {
-        message: `Worker ${this.workerId}: Error deleting GPM profile: ${error.message}`,
-      });
+      retryCount++;
     }
   }
 
@@ -1025,29 +1031,35 @@ class YouTubeWorker {
   }
 
   async stopGPMProfile() {
-    try {
-      if (this.profileId) {
-        await axios.post(
-          `${baseGPMAPIUrl}/api/v3/profiles/stop`,
-          {
-            profile_id: this.profileId,
-          },
-          {
-            headers: {
-              "Content-Type": "application/json",
+    let retryCount = 0;
+    const maxRetries = 3;
+    while (retryCount < maxRetries) {
+      try {
+        if (this.profileId) {
+          await axios.post(
+            `${baseGPMAPIUrl}/api/v3/profiles/stop`,
+            {
+              profile_id: this.profileId,
             },
-            timeout: 10000,
-          },
-        );
-
+            {
+              headers: {
+                "Content-Type": "application/json",
+              },
+              timeout: 100000,
+            },
+          );
+          this.parent.sendMessage("automation-progress", {
+            message: `Worker ${this.workerId}: Stopped GPMLogin profile ${this.profileId}`,
+          });
+          break; // Exit loop on success
+        }
+      } catch (error) {
         this.parent.sendMessage("automation-progress", {
-          message: `Worker ${this.workerId}: Stopped GPMLogin profile ${this.profileId}`,
+          message: `Worker ${this.workerId}: Error stopping GPMLogin profile: ${error.message}`,
         });
       }
-    } catch (error) {
-      this.parent.sendMessage("automation-progress", {
-        message: `Worker ${this.workerId}: Error stopping GPMLogin profile: ${error.message}`,
-      });
+      retryCount++;
+
     }
   }
 
