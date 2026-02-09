@@ -383,34 +383,43 @@ class YouTubeWorker {
   }
 
   async deleteProfile() {
-    let retryCount = 0;
     const maxRetries = 3;
-    while (retryCount < maxRetries) {
+    const retryDelay = 2000;
+    
+    for (let retryCount = 0; retryCount < maxRetries; retryCount++) {
       try {
         if (this.createdProfileId) {
-          const response = await axios.get(
-            `${baseGPMAPIUrl}/api/v3/profiles/delete/${this.createdProfileId}?mode=2`,
-            { timeout: 120000 },
-          );
+          const response = await Promise.race([
+            axios.get(
+              `${baseGPMAPIUrl}/api/v3/profiles/delete/${this.createdProfileId}?mode=2`,
+              { timeout: 8000 },
+            ),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Delete API timeout')), 10000))
+          ]);
 
           if (response.data.success) {
             this.parent.sendMessage("automation-progress", {
               message: `Worker ${this.workerId}: Deleted GPM profile ${this.createdProfileId}`,
             });
+            return; // Success, exit function
           } else {
-            this.parent.sendMessage("automation-progress", {
-              message: `Worker ${this.workerId}: Failed to delete profile: ${response.data.message}`,
-            });
+            throw new Error(response.data.message || 'Delete failed');
           }
-          break; // Exit loop on success
         }
       } catch (error) {
         this.parent.sendMessage("automation-progress", {
-          message: `Worker ${this.workerId}: Error deleting GPM profile: ${error.message}`,
+          message: `Worker ${this.workerId}: Attempt ${retryCount + 1} failed to delete GPM profile: ${error.message}`,
         });
+        
+        if (retryCount < maxRetries - 1) {
+          await this.delay(retryDelay);
+        }
       }
-      retryCount++;
     }
+
+    this.parent.sendMessage("automation-progress", {
+      message: `Worker ${this.workerId}: Failed to delete GPM profile after ${maxRetries} attempts`,
+    });
   }
 
   async initialize() {
@@ -946,12 +955,18 @@ class YouTubeWorker {
                   await element.scrollIntoViewIfNeeded();
                   await this.delay(500);
 
-                  // Try different click methods
+                  // Try different click methods with timeout
                   try {
-                    await element.click({ force: true });
+                    await Promise.race([
+                      element.click({ force: true }),
+                      new Promise((_, reject) => setTimeout(() => reject(new Error('Click timeout')), 3000))
+                    ]);
                   } catch {
-                    // Fallback to JavaScript click
-                    await element.evaluate((el) => el.click());
+                    // Fallback to JavaScript click with timeout
+                    await Promise.race([
+                      element.evaluate((el) => el.click()),
+                      new Promise((_, reject) => setTimeout(() => reject(new Error('JS click timeout')), 3000))
+                    ]);
                   }
 
                   this.parent.sendMessage("automation-progress", {
@@ -984,10 +999,17 @@ class YouTubeWorker {
         });
       } else {
         // Wait after clicking ad to allow page navigation/popup
-        await this.delay(10000);
+        await this.delay(5000);
 
-        // Handle potential new tab/popup
-        await this.handleAdPopup();
+        // Handle potential new tab/popup with timeout
+        await Promise.race([
+          this.handleAdPopup(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Ad popup handling timeout')), 15000))
+        ]).catch(error => {
+          this.parent.sendMessage("automation-progress", {
+            message: `Worker ${this.workerId}: Ad popup handling timeout, continuing...`,
+          });
+        });
       }
     } catch (error) {
       this.parent.sendMessage("automation-progress", {
@@ -1003,18 +1025,48 @@ class YouTubeWorker {
 
       const pages = this.context.pages();
       if (pages.length > 1) {
-        // New tab opened, close it and return to original
-        const newPage = pages[pages.length - 1];
-
-        await this.delay(3000);
         this.parent.sendMessage("automation-progress", {
-          message: `Worker ${this.workerId}: Ad opened new tab, completed.`,
+          message: `Worker ${this.workerId}: Detected ${pages.length} tabs, closing extra tabs...`,
         });
-        await newPage.close();
-        await this.delay(1000);
 
+        // Close all extra tabs (keep only the first one)
+        const extraPages = pages.slice(1);
+        for (const extraPage of extraPages) {
+          try {
+            // Try to close gracefully first
+            await Promise.race([
+              extraPage.close(),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+            ]);
+            
+            this.parent.sendMessage("automation-progress", {
+              message: `Worker ${this.workerId}: Closed extra tab gracefully`,
+            });
+          } catch (error) {
+            // Force close if graceful close fails
+            try {
+              await extraPage.close({ runBeforeUnload: false });
+              this.parent.sendMessage("automation-progress", {
+                message: `Worker ${this.workerId}: Force closed stuck tab`,
+              });
+            } catch (forceError) {
+              this.parent.sendMessage("automation-progress", {
+                message: `Worker ${this.workerId}: Failed to close tab: ${forceError.message}`,
+              });
+            }
+          }
+        }
+
+        await this.delay(1000);
+        
         // Focus back on main page
-        await this.page.bringToFront();
+        try {
+          await this.page.bringToFront();
+        } catch (error) {
+          this.parent.sendMessage("automation-progress", {
+            message: `Worker ${this.workerId}: Could not focus main page: ${error.message}`,
+          });
+        }
       }
     } catch (error) {
       this.parent.sendMessage("automation-progress", {
@@ -1031,63 +1083,130 @@ class YouTubeWorker {
   }
 
   async stopGPMProfile() {
-    let retryCount = 0;
     const maxRetries = 3;
-    while (retryCount < maxRetries) {
+    const retryDelay = 2000;
+    
+    for (let retryCount = 0; retryCount < maxRetries; retryCount++) {
       try {
         if (this.profileId) {
-          await axios.post(
-            `${baseGPMAPIUrl}/api/v3/profiles/stop`,
-            {
-              profile_id: this.profileId,
-            },
-            {
-              headers: {
-                "Content-Type": "application/json",
+          const response = await Promise.race([
+            axios.post(
+              `${baseGPMAPIUrl}/api/v3/profiles/stop`,
+              {
+                profile_id: this.profileId,
               },
-              timeout: 100000,
-            },
-          );
+              {
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                timeout: 8000,
+              },
+            ),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('API timeout')), 10000))
+          ]);
+
           this.parent.sendMessage("automation-progress", {
             message: `Worker ${this.workerId}: Stopped GPMLogin profile ${this.profileId}`,
           });
-          break; // Exit loop on success
+          return; // Success, exit function
         }
       } catch (error) {
         this.parent.sendMessage("automation-progress", {
-          message: `Worker ${this.workerId}: Error stopping GPMLogin profile: ${error.message}`,
+          message: `Worker ${this.workerId}: Attempt ${retryCount + 1} failed to stop GPMLogin profile: ${error.message}`,
         });
+        
+        if (retryCount < maxRetries - 1) {
+          await this.delay(retryDelay);
+        }
       }
-      retryCount++;
-
     }
+
+    this.parent.sendMessage("automation-progress", {
+      message: `Worker ${this.workerId}: Failed to stop GPMLogin profile after ${maxRetries} attempts`,
+    });
   }
 
   async cleanup() {
     try {
-      // Close playwright resources first
-      if (this.page) {
-        await this.page.close();
-      }
+      this.parent.sendMessage("automation-progress", {
+        message: `Worker ${this.workerId}: Starting cleanup...`,
+      });
+
+      // Force close all pages in context first
       if (this.context) {
-        await this.context.close();
+        const pages = this.context.pages();
+        this.parent.sendMessage("automation-progress", {
+          message: `Worker ${this.workerId}: Closing ${pages.length} pages...`,
+        });
+
+        for (const page of pages) {
+          try {
+            // Force close each page with timeout
+            await Promise.race([
+              page.close({ runBeforeUnload: false }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Page close timeout')), 3000))
+            ]);
+          } catch (error) {
+            this.parent.sendMessage("automation-progress", {
+              message: `Worker ${this.workerId}: Force closed stuck page: ${error.message}`,
+            });
+          }
+        }
       }
+
+      // Close playwright resources with timeout
+      if (this.context) {
+        try {
+          await Promise.race([
+            this.context.close(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Context close timeout')), 5000))
+          ]);
+        } catch (error) {
+          this.parent.sendMessage("automation-progress", {
+            message: `Worker ${this.workerId}: Context close timeout, continuing...`,
+          });
+        }
+      }
+
       if (this.browser) {
-        await this.browser.close();
+        try {
+          await Promise.race([
+            this.browser.close(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Browser close timeout')), 5000))
+          ]);
+        } catch (error) {
+          this.parent.sendMessage("automation-progress", {
+            message: `Worker ${this.workerId}: Browser close timeout, continuing...`,
+          });
+        }
       }
 
-      // Stop the GPMLogin profile
-      await this.stopGPMProfile();
+      // Stop the GPMLogin profile with timeout
+      await Promise.race([
+        this.stopGPMProfile(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Stop profile timeout')), 10000))
+      ]).catch(error => {
+        this.parent.sendMessage("automation-progress", {
+          message: `Worker ${this.workerId}: Stop profile timeout: ${error.message}`,
+        });
+      });
 
-      // Delete the created profile
-      await this.deleteProfile();
+      // Delete the created profile with timeout
+      await Promise.race([
+        this.deleteProfile(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Delete profile timeout')), 10000))
+      ]).catch(error => {
+        this.parent.sendMessage("automation-progress", {
+          message: `Worker ${this.workerId}: Delete profile timeout: ${error.message}`,
+        });
+      });
 
       this.parent.sendMessage("automation-progress", {
-        message: `Worker ${this.workerId} cleaned up`,
+        message: `Worker ${this.workerId}: Cleanup completed`,
       });
     } catch (error) {
       this.parent.sendMessage("automation-progress", {
-        message: `Worker ${this.workerId} cleanup error: ${error.message}`,
+        message: `Worker ${this.workerId}: Cleanup error: ${error.message}`,
       });
     }
   }
