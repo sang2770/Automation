@@ -152,9 +152,9 @@ class YouTubeAutomationUI {
       list:
         enableProxy && proxyListText
           ? proxyListText
-              .split("\n")
-              .map((line) => line.trim())
-              .filter((line) => line.length > 0)
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0)
           : [],
     };
   }
@@ -225,6 +225,7 @@ class YouTubeAutomationUI {
       title.textContent = "Edit Link";
       document.getElementById("linkUrl").value = linkData.url || "";
       document.getElementById("linkViews").value = linkData.views || 10;
+      document.getElementById("keywordAsId").checked = linkData.keywordAsId || false;
       document.getElementById("linkKeywords").value = Array.isArray(
         linkData.keywords,
       )
@@ -275,7 +276,7 @@ class YouTubeAutomationUI {
     const views = parseInt(document.getElementById("linkViews").value);
     const keywordsText = document.getElementById("linkKeywords").value.trim();
     const enabled = document.getElementById("linkEnabled").checked;
-
+    const keywordAsId = document.getElementById("keywordAsId").checked;
     // Get ad option
     const adOption = document.getElementById("clickAds").checked
       ? "click"
@@ -300,9 +301,9 @@ class YouTubeAutomationUI {
 
     const keywords = keywordsText
       ? keywordsText
-          .split(",")
-          .map((k) => k.trim())
-          .filter((k) => k)
+        .split(",")
+        .map((k) => k.trim())
+        .filter((k) => k)
       : [];
 
     const linkData = {
@@ -313,6 +314,7 @@ class YouTubeAutomationUI {
       enabled,
       adOption,
       watchDuration,
+      keywordAsId,
     };
 
     // Find existing link or add new one
@@ -365,6 +367,7 @@ class YouTubeAutomationUI {
   resetLinkForm() {
     document.getElementById("linkForm").reset();
     document.getElementById("linkEnabled").checked = true;
+    document.getElementById("keywordAsId").checked = false;
     document.getElementById("clickAds").checked = true;
     document.getElementById("skipAds").checked = false;
     document.getElementById("watchDuration").value = 30;
