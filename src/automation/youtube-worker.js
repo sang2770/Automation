@@ -79,7 +79,7 @@ class AutomationWorker {
 
       // Function to process a single task
       const processTask = async (task, workerId) => {
-        const worker = new YouTubeWorker(workerId, null, this); // Use workerId for positioning
+        const worker = new YouTubeWorker(workerId, this); // Use workerId for positioning
         this.workers.push(worker);
 
         try {
@@ -143,7 +143,6 @@ class AutomationWorker {
 
           const gridPos = new YouTubeWorker(
             workerId,
-            null,
             this,
           ).calculateGridPosition(workerId);
           this.sendMessage("automation-progress", {
@@ -303,9 +302,8 @@ class AutomationWorker {
 }
 
 class YouTubeWorker {
-  constructor(workerId, profileId, parent) {
+  constructor(workerId, parent) {
     this.workerId = workerId;
-    this.profileId = profileId;
     this.parent = parent;
     this.browser = null;
     this.context = null;
@@ -365,13 +363,12 @@ class YouTubeWorker {
         throw new Error(`Failed to create profile: ${response.data.message}`);
       }
       this.createdProfileId = response.data.data.id;
-      this.profileId = this.createdProfileId;
 
       this.parent.sendMessage("automation-progress", {
-        message: `Worker ${this.workerId}: Created new GPM profile ${this.profileId}${proxyConfig ? ` with proxy ${proxyConfig.server}` : ""}`,
+        message: `Worker ${this.workerId}: Created new GPM profile ${this.createdProfileId}${proxyConfig ? ` with proxy ${proxyConfig.server}` : ""}`,
       });
 
-      return this.profileId;
+      return this.createdProfileId;
     } catch (error) {
       if (error.code === "ECONNREFUSED") {
         throw new Error(
@@ -397,12 +394,12 @@ class YouTubeWorker {
             this.parent.sendMessage("automation-progress", {
               message: `Worker ${this.workerId}: Deleted GPM profile ${this.createdProfileId}`,
             });
+            break; // Exit loop on success
           } else {
             this.parent.sendMessage("automation-progress", {
               message: `Worker ${this.workerId}: Failed to delete profile: ${response.data.message}`,
             });
           }
-          break; // Exit loop on success
         }
       } catch (error) {
         this.parent.sendMessage("automation-progress", {
@@ -441,7 +438,7 @@ class YouTubeWorker {
       // Calculate grid position for 3 rows x 4 columns layout
       const { width, height, x, y } = this.calculateGridPosition(this.workerId);
 
-      let baseUrl = `${baseGPMAPIUrl}/api/v3/profiles/start/${this.profileId}`;
+      let baseUrl = `${baseGPMAPIUrl}/api/v3/profiles/start/${this.createdProfileId}`;
 
       // Use calculated grid dimensions or custom options
       const windowWidth = options.width || width;
@@ -464,7 +461,7 @@ class YouTubeWorker {
 
       this.debugPort = response.data.data.remote_debugging_address;
       this.parent.sendMessage("automation-progress", {
-        message: `Worker ${this.workerId}: Started GPMLogin profile ${this.profileId}`,
+        message: `Worker ${this.workerId}: Started GPMLogin profile ${this.createdProfileId}`,
       });
     } catch (error) {
       if (error.code === "ECONNREFUSED") {
@@ -1035,12 +1032,9 @@ class YouTubeWorker {
     const maxRetries = 3;
     while (retryCount < maxRetries) {
       try {
-        if (this.profileId) {
-          await axios.post(
-            `${baseGPMAPIUrl}/api/v3/profiles/stop`,
-            {
-              profile_id: this.profileId,
-            },
+        if (this.createdProfileId) {
+          const response = await axios.get(
+            `${baseGPMAPIUrl}/api/v3/profiles/close/${this.createdProfileId}`,
             {
               headers: {
                 "Content-Type": "application/json",
@@ -1048,8 +1042,14 @@ class YouTubeWorker {
               timeout: 100000,
             },
           );
+          if (!response.data.success) {
+            this.parent.sendMessage("automation-progress", {
+              message: `Worker ${this.workerId}: Failed to stop profile: ${response.data.message}`,
+            });
+            continue;
+          }
           this.parent.sendMessage("automation-progress", {
-            message: `Worker ${this.workerId}: Stopped GPMLogin profile ${this.profileId}`,
+            message: `Worker ${this.workerId}: Stopped GPMLogin profile ${this.createdProfileId}`,
           });
           break; // Exit loop on success
         }
@@ -1059,7 +1059,6 @@ class YouTubeWorker {
         });
       }
       retryCount++;
-
     }
   }
 

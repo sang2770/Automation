@@ -11,7 +11,7 @@
     }
   ],
   "profiles": [],
-  "maxThreads": 3,
+  "maxThreads": 1,
   "settings": {
     "delayBetweenActions": 2000,
     "randomMethod": true
