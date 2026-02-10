@@ -52,11 +52,13 @@ class AutomationWorker {
           tasks.push({
             link: link,
             taskId: `${link.id}_${i + 1}`,
-            method: config.settings.randomMethod
-              ? Math.random() > 0.5
-                ? "method1"
-                : "method2"
-              : "method1",
+            method: link.keywordAsId
+              ? "method3"
+              : config.settings.randomMethod
+                ? Math.random() > 0.5
+                  ? "method1"
+                  : "method2"
+                : "method1",
           });
         }
       });
@@ -584,8 +586,10 @@ class YouTubeWorker {
 
       if (method === "method1") {
         await this.executeMethod1(link, settings);
-      } else {
+      } else if (method === "method2") {
         await this.executeMethod2(link, settings);
+      } else if (method === "method3") {
+        await this.executeMethod3(link, settings);
       }
 
       this.parent.sendMessage("automation-progress", {
@@ -622,6 +626,71 @@ class YouTubeWorker {
       await this.page.waitForTimeout(800);
     }
     return null;
+  }
+
+  async executeMethod3(link, settings) {
+    // Method 3: Go to YouTube → Click on first video → Navigate to related videos → Replace with target link
+    try {
+      // Step 1: Go to YouTube
+      await this.page.goto("https://www.youtube.com/", {
+        waitUntil: "domcontentloaded",
+        timeout: 60000,
+      });
+      // Step 2: Search for keyword if available
+      if (link.keywords && link.keywords.length > 0) {
+        const randomKeyword =
+          link.keywords[Math.floor(Math.random() * link.keywords.length)];
+        // #search-button-narrow
+        try {
+          const searchButtonNarrow = await this.smartWait(
+            "#search-button-narrow",
+            { timeout: 3000 },
+          );
+          if (searchButtonNarrow) {
+            await searchButtonNarrow.click();
+          }
+          await this.delay(2000);
+        } catch (error) {
+          // TODO
+        }
+
+        // Find and click search box
+        const searchBox = await this.smartWait('input[name="search_query"]', {
+          timeout: 15000,
+        });
+        await searchBox.click();
+        await this.humanType(searchBox, randomKeyword);
+        await this.delay(2000);
+        // Submit search
+        await searchBox.press("Enter");
+
+        await this.page.waitForLoadState("domcontentloaded");
+        // Step 3: Click on first video result
+        const firstVideo = await this.scrollUntil(
+          'ytd-video-renderer a#video-title[href*="watch"]',
+        );
+        if (!firstVideo) {
+          this.parent.sendMessage("automation-progress", {
+            message: `Worker ${this.workerId}: No search result → fallback`,
+          });
+          await this.navigateToTargetVideo(link.url);
+          return;
+        }
+        if (firstVideo.href?.includes(randomKeyword)) {
+          await firstVideo.click();
+        } else {
+          await this.navigateToTargetVideo(link.url);
+        }
+        await this.page.waitForLoadState("domcontentloaded");
+      } else {
+        // If no keywords, go directly to method 2 approach
+        await this.navigateToTargetVideo(link.url);
+      }
+      // Step 5: Wait for ads and click if enabled
+      await this.handleAds(link, settings);
+    } catch (error) {
+      throw new Error(`Method 1 failed: ${error.message}`);
+    }
   }
 
   async executeMethod1(link, settings) {
