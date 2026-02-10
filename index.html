@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAV Mixer Pro</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>WAV Mixer Pro</h1>
+            <p>Công cụ Soạn thảo Âm thanh Tự động</p>
+        </header>
+
+        <main>
+            <!-- Input Section 1 -->
+            <section class="input-card" style="margin-bottom: 10px;" id="input1">
+                <div class="card-header">
+                    <span class="badge">Đầu vào 1</span>
+                    <h3>Thư mục Nguồn</h3>
+                </div>
+                <div class="control-group">
+                    <button class="btn-select" id="btn-input1">Chọn Thư mục</button>
+                    <span class="path-display" id="path-input1">Chưa chọn thư mục...</span>
+                </div>
+                <div class="control-group">
+                    <label>Số lượng Tệp:</label>
+                    <input type="number" id="count-input1" min="1" value="1" class="num-input">
+                </div>
+            </section>
+
+            <!-- Input Section 2 -->
+            <section class="input-card" style="margin-bottom: 10px;" id="input2">
+                <div class="card-header">
+                    <span class="badge">Đầu vào 2</span>
+                    <h3>Thư mục Nguồn</h3>
+                </div>
+                <div class="control-group">
+                    <button class="btn-select" id="btn-input2">Chọn Thư mục</button>
+                    <span class="path-display" id="path-input2">Chưa chọn thư mục...</span>
+                </div>
+                <div class="control-group">
+                    <label>Số lượng Tệp:</label>
+                    <input type="number" id="count-input2" min="1" value="1" class="num-input">
+                </div>
+            </section>
+
+            <!-- Input Section 3 -->
+            <section class="input-card" style="margin-bottom: 10px;" id="input3">
+                <div class="card-header">
+                    <span class="badge">Đầu vào 3</span>
+                    <h3>Kết thúc / Nguồn</h3>
+                </div>
+                <div class="control-group">
+                    <button class="btn-select" id="btn-input3">Chọn Thư mục</button>
+                    <span class="path-display" id="path-input3">Chưa chọn thư mục...</span>
+                </div>
+                <div class="control-group">
+                    <label>Số lượng Tệp:</label>
+                    <input type="number" id="count-input3" min="1" value="1" class="num-input">
+                </div>
+            </section>
+
+            <!-- Settings -->
+            <section class="settings-card">
+                <div class="setting-row">
+                    <div class="toggle-wrapper">
+                        <label class="switch">
+                            <input type="checkbox" id="loop-mode">
+                            <span class="slider round"></span>
+                        </label>
+                        <span class="toggle-label">Chế độ Lặp</span>
+                    </div>
+                </div>
+
+                <div class="setting-row hidden" id="duration-settings">
+                    <label>Tổng Thời lượng (Mục tiêu):</label>
+                    <div class="time-inputs">
+                        <input type="number" id="minutes" placeholder="Phút" min="0" value="5">
+                        <span>:</span>
+                        <input type="number" id="seconds" placeholder="Giây" min="0" max="59" value="0">
+                    </div>
+                </div>
+
+                <div class="setting-row">
+                    <label>Thư mục Đầu ra:</label>
+                    <div class="control-group">
+                        <button class="btn-select secondary" id="btn-output">Chọn Đầu ra</button>
+                        <span class="path-display" id="path-output">Chưa chọn thư mục...</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Actions -->
+            <div class="actions">
+                <button id="btn-process" class="btn-primary">Bắt đầu Xử lý</button>
+            </div>
+
+            <!-- Logs -->
+            <div class="console-output">
+                <div class="console-header">Nhật ký Trạng thái</div>
+                <div id="log-content" class="log-content">Đang chờ bắt đầu...</div>
+            </div>
+        </main>
+    </div>
+    <script src="renderer.js"></script>
+</body>
+
+</html>
+```

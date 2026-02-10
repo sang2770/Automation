@@ -1,0 +1,268 @@
+/* Glassmorphism & Modern UI */
+:root {
+    --bg-color: #1a1a2e;
+    --text-color: #fafafa;
+    --primary-color: #e94560;
+    --secondary-color: #0f3460;
+    --accent-color-1: #53354a;
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --input-bg: rgba(0, 0, 0, 0.2);
+    --success-color: #4cd137;
+    --warning-color: #fbc531;
+    --danger-color: #e84118;
+}
+
+body {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 20px;
+    background-image: 
+        radial-gradient(circle at 10% 20%, rgba(233, 69, 96, 0.1) 0%, transparent 20%),
+        radial-gradient(circle at 90% 80%, rgba(15, 52, 96, 0.1) 0%, transparent 20%);
+}
+
+.app-container {
+    width: 100%;
+    max-width: 800px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+h1 {
+    font-weight: 600;
+    margin: 0;
+    font-size: 2rem;
+    background: linear-gradient(90deg, #e94560, #ff6b6b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+p {
+    margin: 5px 0 0;
+    opacity: 0.7;
+    font-size: 0.9rem;
+}
+
+/* CARDS */
+.input-card, .settings-card, .console-output {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.input-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.badge {
+    background: var(--primary-color);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+/* BUTTONS */
+button {
+    cursor: pointer;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.btn-select {
+    background: var(--secondary-color);
+    color: white;
+    border: 1px solid var(--glass-border);
+}
+
+.btn-select:hover {
+    background: #1a4b8c;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+    font-size: 1rem;
+    padding: 12px 24px;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.btn-primary:hover {
+    background: #ff6b6b;
+}
+
+/* INPUTS */
+input {
+    background: var(--input-bg);
+    border: 1px solid var(--glass-border);
+    color: white;
+    padding: 8px;
+    border-radius: 6px;
+    font-family: inherit;
+}
+
+input:focus {
+    outline: 2px solid var(--primary-color);
+    border-color: transparent;
+}
+
+.num-input {
+    width: 60px;
+    text-align: center;
+}
+
+.path-display {
+    font-size: 0.85rem;
+    opacity: 0.7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+/* SETTINGS */
+.settings-card {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* SWITCH */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--input-bg);
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--primary-color);
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+/* HIDDEN */
+.hidden {
+    display: none !important;
+}
+
+/* Console */
+.console-output {
+    background: #000;
+    font-family: 'Courier New', Courier, monospace;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+}
+
+.console-header {
+    border-bottom: 1px solid #333;
+    padding-bottom: 5px;
+    margin-bottom: 5px;
+    font-size: 0.8rem;
+    color: #888;
+}
+
+.log-content {
+    flex: 1;
+    overflow-y: auto;
+    font-size: 0.85rem;
+    color: #ccc;
+    white-space: pre-wrap;
+    max-height: 200px;
+}
+
+.log-entry { margin: 2px 0; }
+.log-info { color: #ccc; }
+.log-success { color: var(--success-color); }
+.log-error { color: var(--danger-color); }
+.log-warn { color: var(--warning-color); }
