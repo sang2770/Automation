@@ -121,28 +121,22 @@ function getDuration(filePath) {
 }
 
 ipcMain.handle("process:start", async (event, config) => {
-  const { input1, input2, input3, output, loop, duration } = config;
+  const { input1, input2, input3, output, loop, duration, runCount = 1 } = config;
   const sender = event.sender;
 
   const log = (msg, type = "info") => {
     sender.send("log:update", { text: msg, type });
   };
 
-  try {
-    // validate dirs
-    if (
-      !fs.existsSync(input1.path) ||
-      !fs.existsSync(input2.path) ||
-      !fs.existsSync(input3.path)
-    ) {
-      throw new Error("One or more input directories do not exist.");
-    }
+  // Function to process a single run
+  const processSingleRun = async (runIndex) => {
+    log(`\n=== Bắt đầu lần chạy ${runIndex}/${runCount} ===`, "info");
 
     const finalList = [];
     let currentDuration = 0;
 
     // Step 1: Prepare Input 3 (Ending)
-    log(`Selecting ${input3.count} files from Input 3 (Ending)...`);
+    log(`[Run ${runIndex}] Selecting ${input3.count} files from Input 3 (Ending)...`);
     const files3 = getRandomFiles(input3.path, input3.count);
     if (files3.length === 0) throw new Error("No WAV files found in Input 3.");
 
@@ -151,17 +145,17 @@ ipcMain.handle("process:start", async (event, config) => {
     for (const file of files3) {
       duration3 += await getDuration(file);
     }
-    log(`Input 3 Duration: ${duration3.toFixed(2)}s`);
+    log(`[Run ${runIndex}] Input 3 Duration: ${duration3.toFixed(2)}s`);
 
     if (loop) {
       const targetDuration = duration; // in seconds
       const neededDuration = targetDuration - duration3;
-      log(`Target Loop Duration: ${targetDuration}s`);
-      log(`Duration to fill with Input 1 & 2: ${neededDuration.toFixed(2)}s`);
+      log(`[Run ${runIndex}] Target Loop Duration: ${targetDuration}s`);
+      log(`[Run ${runIndex}] Duration to fill with Input 1 & 2: ${neededDuration.toFixed(2)}s`);
 
       if (neededDuration <= 0) {
         log(
-          "Warning: Input 3 is longer than target duration. Only Input 3 will be used.",
+          `[Run ${runIndex}] Warning: Input 3 is longer than target duration. Only Input 3 will be used.`,
           "warn",
         );
         finalList.push(...files3);
@@ -180,9 +174,6 @@ ipcMain.handle("process:start", async (event, config) => {
           }
 
           // Append sequence: Input 1 then Input 2
-          // files1.forEach(f => finalList.push(f));
-          // files2.forEach(f => finalList.push(f));
-          // Check duration of this chunk
           for (const f of files1) {
             const d = await getDuration(f);
             filledDuration += d;
@@ -195,14 +186,14 @@ ipcMain.handle("process:start", async (event, config) => {
           }
 
           log(
-            `Iteration ${iteration}: Current Duration ${filledDuration.toFixed(2)}s / ${neededDuration.toFixed(2)}s`,
+            `[Run ${runIndex}] Iteration ${iteration}: Current Duration ${filledDuration.toFixed(2)}s / ${neededDuration.toFixed(2)}s`,
           );
           iteration++;
 
           // Safety break
           if (iteration > 1000) {
             log(
-              "Safety limit reached (1000 iterations). Stopping loop.",
+              `[Run ${runIndex}] Safety limit reached (1000 iterations). Stopping loop.`,
               "warn",
             );
             break;
@@ -214,7 +205,7 @@ ipcMain.handle("process:start", async (event, config) => {
       }
     } else {
       // No Loop Mode
-      log("No Loop Mode: merging randomly selected files once.");
+      log(`[Run ${runIndex}] No Loop Mode: merging randomly selected files once.`);
 
       const files1 = getRandomFiles(input1.path, input1.count);
       const files2 = getRandomFiles(input2.path, input2.count);
@@ -228,13 +219,13 @@ ipcMain.handle("process:start", async (event, config) => {
       finalList.push(...files3);
     }
 
-    log(`Total files to merge: ${finalList.length}`);
+    log(`[Run ${runIndex}] Total files to merge: ${finalList.length}`);
 
     // Merge Logic
     // Create a temporary file list for ffmpeg concat demuxer
     const listPath = path.join(
       app.getPath("temp"),
-      `concat_list_${Date.now()}.txt`,
+      `concat_list_${runIndex}_${Date.now()}.txt`,
     );
     // Format for concat demuxer: file 'path'
     const listContent = finalList
@@ -242,11 +233,34 @@ ipcMain.handle("process:start", async (event, config) => {
       .join("\n");
     fs.writeFileSync(listPath, listContent);
 
-    const outputFileName = `output_${Date.now()}.wav`;
+    const timestamp = Date.now();
+    const outputFileName = `output_${runIndex}_${timestamp}.wav`;
     const outputPath = path.join(output, outputFileName);
 
+    // Create text log file with the list of merged files
+    const logFileName = `output_${runIndex}_${timestamp}.txt`;
+    const logFilePath = path.join(output, logFileName);
+
+    // Create log content with file order
+    let logFileContent = `=== Lần chạy ${runIndex}/${runCount} ===\n`;
+    logFileContent += `Thời gian: ${new Date().toLocaleString('vi-VN')}\n`;
+    logFileContent += `Tổng số file: ${finalList.length}\n\n`;
+    logFileContent += `Danh sách file theo thứ tự:\n`;
+    logFileContent += `${'='.repeat(80)}\n\n`;
+
+    finalList.forEach((file, index) => {
+      const fileName = path.basename(file);
+      const fileDir = path.basename(path.dirname(file));
+      logFileContent += `${index + 1}. ${fileName}\n`;
+      logFileContent += `   Thư mục: ${fileDir}\n`;
+      logFileContent += `   Đường dẫn: ${file}\n\n`;
+    });
+
+    fs.writeFileSync(logFilePath, logFileContent, 'utf-8');
+    log(`[Run ${runIndex}] Đã tạo file log: ${logFileName}`);
+
     log(
-      `Processing merge... ${finalList.length} files. Output target: ${outputPath}`,
+      `[Run ${runIndex}] Đang xử lý ghép... ${finalList.length} files. Output: ${outputPath}`,
     );
 
     await new Promise((resolve, reject) => {
@@ -255,7 +269,7 @@ ipcMain.handle("process:start", async (event, config) => {
         .inputOptions(["-f concat", "-safe 0"])
         .outputOptions("-c copy") // Using copy for speed.
         .on("start", (cmd) => {
-          log(`FFmpeg command started: ${cmd}`);
+          log(`[Run ${runIndex}] Bắt đầu xử lý...`);
         })
         .on("progress", (progress) => {
           if (progress.percent) {
@@ -264,7 +278,7 @@ ipcMain.handle("process:start", async (event, config) => {
           }
         })
         .on("error", (err) => {
-          log(`FFmpeg Error: ${err.message}`, "error");
+          log(`[Run ${runIndex}] FFmpeg Error: ${err.message}`, "error");
           reject(err);
         })
         .on("end", () => {
@@ -276,7 +290,32 @@ ipcMain.handle("process:start", async (event, config) => {
     // Cleanup
     fs.unlinkSync(listPath);
 
-    sender.send("process:complete", `Success! Saved to ${outputPath}`);
+    log(`✓ Hoàn thành lần chạy ${runIndex}: ${outputFileName}`, "success");
+    return { runIndex, outputFileName };
+  };
+
+  try {
+    // validate dirs
+    if (
+      !fs.existsSync(input1.path) ||
+      !fs.existsSync(input2.path) ||
+      !fs.existsSync(input3.path)
+    ) {
+      throw new Error("Một hoặc nhiều thư mục đầu vào không tồn tại.");
+    }
+
+    log(`Bắt đầu xử lý ${runCount} lần SONG SONG (đa luồng)...`, "info");
+
+    // Create array of promises for parallel processing
+    const runPromises = [];
+    for (let runIndex = 1; runIndex <= runCount; runIndex++) {
+      runPromises.push(processSingleRun(runIndex));
+    }
+
+    // Execute all runs in parallel
+    const results = await Promise.all(runPromises);
+
+    sender.send("process:complete", `Thành công! Đã tạo ${runCount} output trong ${output}`);
   } catch (err) {
     log(`Error: ${err.message}`, "error");
     sender.send("process:error", err.message);

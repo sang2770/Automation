@@ -18,6 +18,8 @@ const hoursInput = document.getElementById('hours');
 const btnOutput = document.getElementById('btn-output');
 const pathOutput = document.getElementById('path-output');
 
+const runCountInput = document.getElementById('run-count');
+
 const btnProcess = document.getElementById('btn-process');
 const logContent = document.getElementById('log-content');
 
@@ -64,13 +66,16 @@ btnProcess.addEventListener('click', async () => {
         return;
     }
 
+    const runCount = parseInt(runCountInput.value) || 1;
+
     const config = {
         input1: { path: paths.input1, count: parseInt(countInput1.value) || 1 },
         input2: { path: paths.input2, count: parseInt(countInput2.value) || 1 },
         input3: { path: paths.input3, count: parseInt(countInput3.value) || 1 },
         output: paths.output,
         loop: loopMode.checked,
-        duration: (parseInt(minutesInput.value) || 0) * 60 + (parseInt(hoursInput.value) || 0) * 3600
+        duration: (parseInt(minutesInput.value) || 0) * 60 + (parseInt(hoursInput.value) || 0) * 3600,
+        runCount: runCount
     };
 
     if (config.loop && config.duration <= 0) {
@@ -80,7 +85,7 @@ btnProcess.addEventListener('click', async () => {
 
     btnProcess.disabled = true;
     btnProcess.textContent = 'Đang xử lý...';
-    log('Bắt đầu xử lý...', 'info');
+    log(`Bắt đầu xử lý ${runCount} lần...`, 'info');
 
     try {
         await window.electronAPI.processAudio(config);
@@ -162,7 +167,7 @@ async function loadSettings() {
 // Attach Save Listeners
 const inputsToWatch = [
     countInput1, countInput2, countInput3,
-    loopMode, minutesInput, hoursInput
+    loopMode, minutesInput, hoursInput, runCountInput
 ];
 
 inputsToWatch.forEach(el => {
