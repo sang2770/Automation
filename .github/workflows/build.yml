@@ -56,14 +56,14 @@ jobs:
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/feature/music')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: YouTube Automation v${{ github.run_number }}
+          tag_name: v${{ github.run_number }}-${{ github.run_attempt }}
+          name: Music tool v${{ github.run_number }}
           files: |
             dist/**/*.exe
           draft: false
           prerelease: false
           body: |
-            🚀 **YouTube Automation Tool - Windows Release**
+            🚀 *Music Tool - Windows Release**
 
             **Build Information:**
             - Version: v${{ github.run_number }}
