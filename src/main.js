@@ -234,12 +234,20 @@ ipcMain.handle("process:start", async (event, config) => {
     fs.writeFileSync(listPath, listContent);
 
     const timestamp = Date.now();
-    const outputFileName = `output_${runIndex}_${timestamp}.wav`;
-    const outputPath = path.join(output, outputFileName);
+    const folderName = `output_${runIndex}_${timestamp}`;
+    const folderPath = path.join(output, folderName);
+
+    // Create the subdirectory if it doesn't exist
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
+    }
+
+    const outputFileName = `${folderName}.wav`; // Files inside can match folder name for clarity
+    const outputPath = path.join(folderPath, outputFileName);
 
     // Create text log file with the list of merged files
-    const logFileName = `output_${runIndex}_${timestamp}.txt`;
-    const logFilePath = path.join(output, logFileName);
+    const logFileName = `${folderName}.txt`;
+    const logFilePath = path.join(folderPath, logFileName);
 
     // Create log content with file order
     let logFileContent = `=== Lần chạy ${runIndex}/${runCount} ===\n`;
