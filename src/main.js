@@ -211,7 +211,123 @@ ipcMain.handle("process:start", async (event, config) => {
           }
         }
 
-        // Append Ending
+        // Check if we need to trim the last file to achieve exact duration
+        let currentDuration = 0;
+        for (const file of finalList) {
+          currentDuration += await getDuration(file);
+        }
+        
+        // Calculate exact remaining time needed (excluding ending)
+        const exactRemainingTime = neededDuration - currentDuration;
+        
+        if (exactRemainingTime > 0.1) { // Need more time (tolerance 0.1s)
+          log(`[Run ${runIndex}] Cần thêm chính xác ${exactRemainingTime.toFixed(3)}s`);
+          
+          // Add one more file and then trim it to exact duration needed
+          const useInput1 = Math.random() < 0.5;
+          const moreFiles = useInput1 
+            ? getRandomFiles(input1.path, 1) 
+            : getRandomFiles(input2.path, 1);
+          
+          if (moreFiles.length > 0) {
+            const additionalFile = moreFiles[0];
+            const additionalDuration = await getDuration(additionalFile);
+            
+            if (additionalDuration >= exactRemainingTime) {
+              // Trim this file to exact duration needed
+              log(`[Run ${runIndex}] Cắt file "${path.basename(additionalFile)}" để lấy chính xác ${exactRemainingTime.toFixed(3)}s`);
+              
+              const tempDir = app.getPath("temp");
+              const trimmedFileName = `exact_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${path.basename(additionalFile)}`;
+              const trimmedFilePath = path.join(tempDir, trimmedFileName);
+              
+              await new Promise((resolve, reject) => {
+                ffmpeg(additionalFile)
+                  .outputOptions(["-t", exactRemainingTime.toFixed(3)])
+                  .outputOptions(["-c", "copy"])
+                  .output(trimmedFilePath)
+                  .on("end", resolve)
+                  .on("error", reject)
+                  .run();
+              });
+              
+              finalList.push(trimmedFilePath);
+              log(`[Run ${runIndex}] Đã thêm file cắt chính xác: ${trimmedFileName}`);
+            } else {
+              // Add whole file if it's shorter than needed
+              finalList.push(additionalFile);
+              log(`[Run ${runIndex}] Thêm toàn bộ file: ${path.basename(additionalFile)} (${additionalDuration.toFixed(3)}s)`);
+            }
+          }
+        } else if (exactRemainingTime < -0.1) { // Have excess time (tolerance 0.1s)
+          // Need to trim the last file to exact duration
+          const excessTime = Math.abs(exactRemainingTime);
+          const lastFile = finalList[finalList.length - 1];
+          const lastFileDuration = await getDuration(lastFile);
+          
+          log(`[Run ${runIndex}] Thời gian thừa ${excessTime.toFixed(3)}s, cắt file cuối cùng`);
+          
+          if (lastFileDuration > excessTime + 1) { // Keep at least 1 second
+            const exactTrimmedDuration = lastFileDuration - excessTime;
+            log(`[Run ${runIndex}] Cắt file "${path.basename(lastFile)}" xuống chính xác ${exactTrimmedDuration.toFixed(3)}s`);
+            
+            const tempDir = app.getPath("temp");
+            const trimmedFileName = `exact_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${path.basename(lastFile)}`;
+            const trimmedFilePath = path.join(tempDir, trimmedFileName);
+            
+            await new Promise((resolve, reject) => {
+              ffmpeg(lastFile)
+                .outputOptions(["-t", exactTrimmedDuration.toFixed(3)])
+                .outputOptions(["-c", "copy"])
+                .output(trimmedFilePath)
+                .on("end", resolve)
+                .on("error", reject)
+                .run();
+            });
+            
+            finalList[finalList.length - 1] = trimmedFilePath;
+            log(`[Run ${runIndex}] Đã tạo file cắt chính xác: ${trimmedFileName}`);
+          } else {
+            // Remove last file and try to trim the previous one
+            finalList.pop();
+            if (finalList.length > 0) {
+              const prevFile = finalList[finalList.length - 1];
+              const prevFileDuration = await getDuration(prevFile);
+              const newExcessTime = excessTime - lastFileDuration;
+              
+              if (prevFileDuration > newExcessTime + 1) {
+                const exactTrimmedDuration = prevFileDuration - newExcessTime;
+                log(`[Run ${runIndex}] Cắt file trước đó "${path.basename(prevFile)}" xuống ${exactTrimmedDuration.toFixed(3)}s`);
+                
+                const tempDir = app.getPath("temp");
+                const trimmedFileName = `exact_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${path.basename(prevFile)}`;
+                const trimmedFilePath = path.join(tempDir, trimmedFileName);
+                
+                await new Promise((resolve, reject) => {
+                  ffmpeg(prevFile)
+                    .outputOptions(["-t", exactTrimmedDuration.toFixed(3)])
+                    .outputOptions(["-c", "copy"])
+                    .output(trimmedFilePath)
+                    .on("end", resolve)
+                    .on("error", reject)
+                    .run();
+                });
+                
+                finalList[finalList.length - 1] = trimmedFilePath;
+                log(`[Run ${runIndex}] Đã tạo file cắt chính xác: ${trimmedFileName}`);
+              }
+            }
+          }
+        }
+
+        // Verify final duration before adding ending
+        let verifyDuration = 0;
+        for (const file of finalList) {
+          verifyDuration += await getDuration(file);
+        }
+        log(`[Run ${runIndex}] Duration loop đã điều chỉnh: ${verifyDuration.toFixed(3)}s (mục tiêu: ${neededDuration.toFixed(3)}s)`);
+
+        // Append Ending (Input 3 remains intact)
         finalList.push(...files3);
       }
     } else {
@@ -265,7 +381,27 @@ ipcMain.handle("process:start", async (event, config) => {
     // Create log content with file order
     let logFileContent = `=== Lần chạy ${runIndex}/${runCount} ===\n`;
     logFileContent += `Thời gian: ${new Date().toLocaleString("vi-VN")}\n`;
-    logFileContent += `Tổng số file: ${finalList.length}\n\n`;
+    logFileContent += `Tổng số file: ${finalList.length}\n`;
+    
+    // Calculate and display exact final duration
+    let totalFinalDuration = 0;
+    for (const file of finalList) {
+      totalFinalDuration += await getDuration(file);
+    }
+    
+    const hours = Math.floor(totalFinalDuration / 3600);
+    const minutes = Math.floor((totalFinalDuration % 3600) / 60);
+    const seconds = Math.floor(totalFinalDuration % 60);
+    const milliseconds = Math.floor((totalFinalDuration % 1) * 1000);
+    
+    logFileContent += `Duration chính xác: ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}\n`;
+    logFileContent += `Duration (giây): ${totalFinalDuration.toFixed(3)}s\n`;
+    if (loop) {
+      logFileContent += `Duration mục tiêu: ${duration.toFixed(3)}s\n`;
+      const difference = Math.abs(totalFinalDuration - duration);
+      logFileContent += `Chênh lệch: ${difference.toFixed(3)}s\n`;
+    }
+    logFileContent += `\n`;
     logFileContent += `Danh sách file theo thứ tự:\n`;
     logFileContent += `${"=".repeat(80)}\n\n`;
 
@@ -295,8 +431,7 @@ ipcMain.handle("process:start", async (event, config) => {
         })
         .on("progress", (progress) => {
           if (progress.percent) {
-            // log(`Progress: ${Math.floor(progress.percent)}%`);
-            // Too spammy for IPC?
+            log(`[Run ${runIndex}] Tiến độ: ${Math.floor(progress.percent)}%`);
           }
         })
         .on("error", (err) => {
@@ -311,6 +446,18 @@ ipcMain.handle("process:start", async (event, config) => {
 
     // Cleanup
     fs.unlinkSync(listPath);
+    
+    // Cleanup any temporary trimmed/exact files
+    finalList.forEach(file => {
+      if (file.includes(app.getPath("temp")) && (file.includes("trimmed_") || file.includes("exact_"))) {
+        try {
+          fs.unlinkSync(file);
+          log(`[Run ${runIndex}] Đã xóa file tạm: ${path.basename(file)}`);
+        } catch (err) {
+          // Ignore cleanup errors
+        }
+      }
+    });
 
     log(`✓ Hoàn thành lần chạy ${runIndex}: ${outputFileName}`, "success");
     return { runIndex, outputFileName };
