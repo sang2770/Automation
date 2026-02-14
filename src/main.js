@@ -121,7 +121,15 @@ function getDuration(filePath) {
 }
 
 ipcMain.handle("process:start", async (event, config) => {
-  const { input1, input2, input3, output, loop, duration, runCount = 1 } = config;
+  const {
+    input1,
+    input2,
+    input3,
+    output,
+    loop,
+    duration,
+    runCount = 1,
+  } = config;
   const sender = event.sender;
 
   const log = (msg, type = "info") => {
@@ -133,10 +141,11 @@ ipcMain.handle("process:start", async (event, config) => {
     log(`\n=== Bắt đầu lần chạy ${runIndex}/${runCount} ===`, "info");
 
     const finalList = [];
-    let currentDuration = 0;
 
     // Step 1: Prepare Input 3 (Ending)
-    log(`[Run ${runIndex}] Selecting ${input3.count} files from Input 3 (Ending)...`);
+    log(
+      `[Run ${runIndex}] Selecting ${input3.count} files from Input 3 (Ending)...`,
+    );
     const files3 = getRandomFiles(input3.path, input3.count);
     if (files3.length === 0) throw new Error("No WAV files found in Input 3.");
 
@@ -151,7 +160,9 @@ ipcMain.handle("process:start", async (event, config) => {
       const targetDuration = duration; // in seconds
       const neededDuration = targetDuration - duration3;
       log(`[Run ${runIndex}] Target Loop Duration: ${targetDuration}s`);
-      log(`[Run ${runIndex}] Duration to fill with Input 1 & 2: ${neededDuration.toFixed(2)}s`);
+      log(
+        `[Run ${runIndex}] Duration to fill with Input 1 & 2: ${neededDuration.toFixed(2)}s`,
+      );
 
       if (neededDuration <= 0) {
         log(
@@ -205,7 +216,9 @@ ipcMain.handle("process:start", async (event, config) => {
       }
     } else {
       // No Loop Mode
-      log(`[Run ${runIndex}] No Loop Mode: merging randomly selected files once.`);
+      log(
+        `[Run ${runIndex}] No Loop Mode: merging randomly selected files once.`,
+      );
 
       const files1 = getRandomFiles(input1.path, input1.count);
       const files2 = getRandomFiles(input2.path, input2.count);
@@ -251,10 +264,10 @@ ipcMain.handle("process:start", async (event, config) => {
 
     // Create log content with file order
     let logFileContent = `=== Lần chạy ${runIndex}/${runCount} ===\n`;
-    logFileContent += `Thời gian: ${new Date().toLocaleString('vi-VN')}\n`;
+    logFileContent += `Thời gian: ${new Date().toLocaleString("vi-VN")}\n`;
     logFileContent += `Tổng số file: ${finalList.length}\n\n`;
     logFileContent += `Danh sách file theo thứ tự:\n`;
-    logFileContent += `${'='.repeat(80)}\n\n`;
+    logFileContent += `${"=".repeat(80)}\n\n`;
 
     finalList.forEach((file, index) => {
       const fileName = path.basename(file);
@@ -264,7 +277,7 @@ ipcMain.handle("process:start", async (event, config) => {
       logFileContent += `   Đường dẫn: ${file}\n\n`;
     });
 
-    fs.writeFileSync(logFilePath, logFileContent, 'utf-8');
+    fs.writeFileSync(logFilePath, logFileContent, "utf-8");
     log(`[Run ${runIndex}] Đã tạo file log: ${logFileName}`);
 
     log(
@@ -274,8 +287,9 @@ ipcMain.handle("process:start", async (event, config) => {
     await new Promise((resolve, reject) => {
       ffmpeg()
         .input(listPath)
-        .inputOptions(["-f concat", "-safe 0"])
-        .outputOptions("-c copy") // Using copy for speed.
+        .inputOptions(["-f", "concat", "-safe", "0"])
+        .outputOptions(["-c", "copy", "-rf64", "always"])
+        .format("wav")
         .on("start", (cmd) => {
           log(`[Run ${runIndex}] Bắt đầu xử lý...`);
         })
@@ -323,7 +337,10 @@ ipcMain.handle("process:start", async (event, config) => {
     // Execute all runs in parallel
     const results = await Promise.all(runPromises);
 
-    sender.send("process:complete", `Thành công! Đã tạo ${runCount} output trong ${output}`);
+    sender.send(
+      "process:complete",
+      `Thành công! Đã tạo ${runCount} output trong ${output}`,
+    );
   } catch (err) {
     log(`Error: ${err.message}`, "error");
     sender.send("process:error", err.message);

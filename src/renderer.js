@@ -14,6 +14,7 @@ const loopMode = document.getElementById('loop-mode');
 const durationSettings = document.getElementById('duration-settings');
 const minutesInput = document.getElementById('minutes');
 const hoursInput = document.getElementById('hours');
+const secondsInput = document.getElementById('seconds');
 
 const btnOutput = document.getElementById('btn-output');
 const pathOutput = document.getElementById('path-output');
@@ -74,7 +75,7 @@ btnProcess.addEventListener('click', async () => {
         input3: { path: paths.input3, count: parseInt(countInput3.value) || 1 },
         output: paths.output,
         loop: loopMode.checked,
-        duration: (parseInt(minutesInput.value) || 0) * 60 + (parseInt(hoursInput.value) || 0) * 3600,
+        duration: (parseInt(minutesInput.value) || 0) * 60 + (parseInt(hoursInput.value) || 0) * 3600 + (parseInt(secondsInput.value) || 0),
         runCount: runCount
     };
 
@@ -106,8 +107,10 @@ function getSettings() {
         loop: loopMode.checked,
         duration: {
             minutes: minutesInput.value,
-            hours: hoursInput.value
-        }
+            hours: hoursInput.value,
+            seconds: secondsInput.value
+        },
+        runCount: runCountInput.value
     };
 }
 
@@ -159,6 +162,7 @@ async function loadSettings() {
     if (settings.duration) {
         minutesInput.value = settings.duration.minutes || 5;
         hoursInput.value = settings.duration.hours || 0;
+        secondsInput.value = settings.duration.seconds || 0;
     }
 
     log('Đã tải cấu hình lưu trước đó.', 'success');
@@ -167,7 +171,7 @@ async function loadSettings() {
 // Attach Save Listeners
 const inputsToWatch = [
     countInput1, countInput2, countInput3,
-    loopMode, minutesInput, hoursInput, runCountInput
+    loopMode, minutesInput, hoursInput, secondsInput, runCountInput
 ];
 
 inputsToWatch.forEach(el => {
