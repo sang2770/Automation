@@ -180,13 +180,66 @@ ipcMain.handle("process:start", async (event, config) => {
 
     let mainList = [];
     let currentDuration = 0;
-    let safety = 0;
 
-    while (currentDuration < targetMainDuration) {
-      safety++;
-      if (safety > 1000)
-        throw new Error("Safety limit reached (1000 iterations)");
+    if (loop) {
+      let safety = 0;
 
+      while (currentDuration < targetMainDuration) {
+        safety++;
+        if (safety > 1000)
+          throw new Error("Safety limit reached (1000 iterations)");
+
+        const files1 = getRandomFiles(input1.path, input1.count);
+        const files2 = getRandomFiles(input2.path, input2.count);
+
+        if (files1.length === 0 && files2.length === 0)
+          throw new Error("Không tìm thấy file trong Input1 hoặc Input2.");
+
+        for (const file of [...files1, ...files2]) {
+          const fileDuration = await getDuration(file);
+
+          if (currentDuration + fileDuration <= targetMainDuration) {
+            mainList.push(file);
+            currentDuration += fileDuration;
+          } else {
+            const remain = targetMainDuration - currentDuration;
+
+            if (remain > 0.05) {
+              const tempDir = app.getPath("temp");
+              const trimmedPath = path.join(
+                tempDir,
+                `exact_${Date.now()}_${Math.random()
+                  .toString(36)
+                  .slice(2)}.wav`
+              );
+
+              await new Promise((resolve, reject) => {
+                ffmpeg(file)
+                  .setStartTime(0)
+                  .duration(remain)
+                  .audioCodec("pcm_s16le")
+                  .format("wav")
+                  .on("end", resolve)
+                  .on("error", reject)
+                  .save(trimmedPath);
+              });
+
+              mainList.push(trimmedPath);
+              currentDuration += remain;
+
+              log(
+                `[Run ${runIndex}] Cắt file ${path.basename(
+                  file
+                )} lấy ${remain.toFixed(3)}s`
+              );
+            }
+
+            break;
+          }
+        }
+      }
+    } else {
+      // KHÔNG LOOP — chỉ lấy 1 lượt
       const files1 = getRandomFiles(input1.path, input1.count);
       const files2 = getRandomFiles(input2.path, input2.count);
 
@@ -215,7 +268,7 @@ ipcMain.handle("process:start", async (event, config) => {
               ffmpeg(file)
                 .setStartTime(0)
                 .duration(remain)
-                .audioCodec("pcm_s16le") // chính xác tuyệt đối
+                .audioCodec("pcm_s16le")
                 .format("wav")
                 .on("end", resolve)
                 .on("error", reject)
@@ -305,6 +358,39 @@ ipcMain.handle("process:start", async (event, config) => {
     fs.unlinkSync(listPath);
 
     // ==============================
+    // 📝 EXPORT TXT DANH SÁCH GHÉP
+    // ==============================
+
+    const logFileName = outputName.replace(".wav", "_log.txt");
+    const logFilePath = path.join(output, logFileName);
+
+    let logFileContent = "";
+
+    // Header
+    logFileContent += `Run: ${runIndex}/${runCount}\n`;
+    logFileContent += `Output file: ${outputName}\n`;
+    logFileContent += `Tổng số file ghép: ${finalList.length}\n`;
+    logFileContent += `Duration target: ${duration}s\n`;
+    logFileContent += `${"=".repeat(80)}\n`;
+
+    logFileContent += `\n`;
+    logFileContent += `Danh sách file theo thứ tự:\n`;
+    logFileContent += `${"=".repeat(80)}\n\n`;
+
+    finalList.forEach((file, index) => {
+      const fileName = path.basename(file);
+      const fileDir = path.basename(path.dirname(file));
+
+      logFileContent += `${index + 1}. ${fileName}\n`;
+      logFileContent += `   Thư mục: ${fileDir}\n`;
+      logFileContent += `   Đường dẫn: ${file}\n\n`;
+    });
+
+    fs.writeFileSync(logFilePath, logFileContent, "utf-8");
+
+    log(`[Run ${runIndex}] Đã tạo file log: ${logFileName}`);                                                             
+
+    // ==============================
     // 6️⃣ CLEAN TEMP FILES
     // ==============================
 
@@ -352,4 +438,5 @@ ipcMain.handle("process:start", async (event, config) => {
     sender.send("process:error", err.message);
   }
 });
+
 
