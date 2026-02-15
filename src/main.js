@@ -122,6 +122,7 @@ function getDuration(filePath) {
   });
 }
 
+
 ipcMain.handle("process:start", async (event, config) => {
   const {
     input1,
@@ -132,334 +133,199 @@ ipcMain.handle("process:start", async (event, config) => {
     duration,
     runCount = 1,
   } = config;
+
   const sender = event.sender;
 
   const log = (msg, type = "info") => {
     sender.send("log:update", { text: msg, type });
   };
 
-  // Function to process a single run
   const processSingleRun = async (runIndex) => {
-    log(`\n=== Bắt đầu lần chạy ${runIndex}/${runCount} ===`, "info");
+    log(`\n=== Bắt đầu lần chạy ${runIndex}/${runCount} ===`);
 
     const finalList = [];
 
-    // Step 1: Prepare Input 3 (Ending)
-    log(
-      `[Run ${runIndex}] Selecting ${input3.count} files from Input 3 (Ending)...`,
-    );
+    // ==============================
+    // 1️⃣ LẤY INPUT 3 (ENDING)
+    // ==============================
+
     const files3 = getRandomFiles(input3.path, input3.count);
-    if (files3.length === 0) throw new Error("No WAV files found in Input 3.");
+    if (files3.length === 0)
+      throw new Error("Không tìm thấy file trong Input 3.");
 
-    // Calculate duration of ending
     let duration3 = 0;
-    for (const file of files3) {
-      duration3 += await getDuration(file);
+    for (const f of files3) {
+      duration3 += await getDuration(f);
     }
-    log(`[Run ${runIndex}] Input 3 Duration: ${duration3.toFixed(2)}s`);
 
-    if (loop) {
-      const targetDuration = duration; // in seconds
-      const neededDuration = targetDuration - duration3;
-      log(`[Run ${runIndex}] Target Loop Duration: ${targetDuration}s`);
-      log(
-        `[Run ${runIndex}] Duration to fill with Input 1 & 2: ${neededDuration.toFixed(2)}s`,
+    if (duration3 > duration) {
+      throw new Error(
+        `Input3 (${duration3.toFixed(
+          3
+        )}s) dài hơn duration yêu cầu (${duration}s). Không được cắt Input3.`
       );
+    }
 
-      if (neededDuration <= 0) {
-        log(
-          `[Run ${runIndex}] Warning: Input 3 is longer than target duration. Only Input 3 will be used.`,
-          "warn",
-        );
-        finalList.push(...files3);
-      } else {
-        let filledDuration = 0;
-        let iteration = 1;
+    const targetMainDuration = duration - duration3;
 
-        while (filledDuration < neededDuration) {
-          // Pick from Input 1
-          const files1 = getRandomFiles(input1.path, input1.count);
-          // Pick from Input 2
-          const files2 = getRandomFiles(input2.path, input2.count);
+    log(
+      `[Run ${runIndex}] Input3: ${duration3.toFixed(
+        3
+      )}s | Cần từ Input1+2: ${targetMainDuration.toFixed(3)}s`
+    );
 
-          if (files1.length === 0 && files2.length === 0) {
-            throw new Error("No WAV files found in Input 1 or Input 2.");
-          }
+    // ==============================
+    // 2️⃣ BUILD MAIN LIST (1+2)
+    // ==============================
 
-          // Append sequence: Input 1 then Input 2
-          for (const f of files1) {
-            const d = await getDuration(f);
-            filledDuration += d;
-            finalList.push(f);
-          }
-          for (const f of files2) {
-            const d = await getDuration(f);
-            filledDuration += d;
-            finalList.push(f);
-          }
+    let mainList = [];
+    let currentDuration = 0;
+    let safety = 0;
 
-          log(
-            `[Run ${runIndex}] Iteration ${iteration}: Current Duration ${filledDuration.toFixed(2)}s / ${neededDuration.toFixed(2)}s`,
-          );
-          iteration++;
-
-          // Safety break
-          if (iteration > 1000) {
-            log(
-              `[Run ${runIndex}] Safety limit reached (1000 iterations). Stopping loop.`,
-              "warn",
-            );
-            break;
-          }
-        }
-
-        // Check if we need to trim the last file to achieve exact duration
-        let currentDuration = 0;
-        for (const file of finalList) {
-          currentDuration += await getDuration(file);
-        }
-        
-        // Calculate exact remaining time needed (excluding ending)
-        const exactRemainingTime = neededDuration - currentDuration;
-        
-        if (exactRemainingTime > 0.1) { // Need more time (tolerance 0.1s)
-          log(`[Run ${runIndex}] Cần thêm chính xác ${exactRemainingTime.toFixed(3)}s`);
-          
-          // Add one more file and then trim it to exact duration needed
-          const useInput1 = Math.random() < 0.5;
-          const moreFiles = useInput1 
-            ? getRandomFiles(input1.path, 1) 
-            : getRandomFiles(input2.path, 1);
-          
-          if (moreFiles.length > 0) {
-            const additionalFile = moreFiles[0];
-            const additionalDuration = await getDuration(additionalFile);
-            
-            if (additionalDuration >= exactRemainingTime) {
-              // Trim this file to exact duration needed
-              log(`[Run ${runIndex}] Cắt file "${path.basename(additionalFile)}" để lấy chính xác ${exactRemainingTime.toFixed(3)}s`);
-              
-              const tempDir = app.getPath("temp");
-              const trimmedFileName = `exact_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${path.basename(additionalFile)}`;
-              const trimmedFilePath = path.join(tempDir, trimmedFileName);
-              
-              await new Promise((resolve, reject) => {
-                ffmpeg(additionalFile)
-                  .outputOptions(["-t", exactRemainingTime.toFixed(3)])
-                  .outputOptions(["-c", "copy"])
-                  .output(trimmedFilePath)
-                  .on("end", resolve)
-                  .on("error", reject)
-                  .run();
-              });
-              
-              finalList.push(trimmedFilePath);
-              log(`[Run ${runIndex}] Đã thêm file cắt chính xác: ${trimmedFileName}`);
-            } else {
-              // Add whole file if it's shorter than needed
-              finalList.push(additionalFile);
-              log(`[Run ${runIndex}] Thêm toàn bộ file: ${path.basename(additionalFile)} (${additionalDuration.toFixed(3)}s)`);
-            }
-          }
-        } else if (exactRemainingTime < -0.1) { // Have excess time (tolerance 0.1s)
-          // Need to trim the last file to exact duration
-          const excessTime = Math.abs(exactRemainingTime);
-          const lastFile = finalList[finalList.length - 1];
-          const lastFileDuration = await getDuration(lastFile);
-          
-          log(`[Run ${runIndex}] Thời gian thừa ${excessTime.toFixed(3)}s, cắt file cuối cùng`);
-          
-          if (lastFileDuration > excessTime + 1) { // Keep at least 1 second
-            const exactTrimmedDuration = lastFileDuration - excessTime;
-            log(`[Run ${runIndex}] Cắt file "${path.basename(lastFile)}" xuống chính xác ${exactTrimmedDuration.toFixed(3)}s`);
-            
-            const tempDir = app.getPath("temp");
-            const trimmedFileName = `exact_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${path.basename(lastFile)}`;
-            const trimmedFilePath = path.join(tempDir, trimmedFileName);
-            
-            await new Promise((resolve, reject) => {
-              ffmpeg(lastFile)
-                .outputOptions(["-t", exactTrimmedDuration.toFixed(3)])
-                .outputOptions(["-c", "copy"])
-                .output(trimmedFilePath)
-                .on("end", resolve)
-                .on("error", reject)
-                .run();
-            });
-            
-            finalList[finalList.length - 1] = trimmedFilePath;
-            log(`[Run ${runIndex}] Đã tạo file cắt chính xác: ${trimmedFileName}`);
-          } else {
-            // Remove last file and try to trim the previous one
-            finalList.pop();
-            if (finalList.length > 0) {
-              const prevFile = finalList[finalList.length - 1];
-              const prevFileDuration = await getDuration(prevFile);
-              const newExcessTime = excessTime - lastFileDuration;
-              
-              if (prevFileDuration > newExcessTime + 1) {
-                const exactTrimmedDuration = prevFileDuration - newExcessTime;
-                log(`[Run ${runIndex}] Cắt file trước đó "${path.basename(prevFile)}" xuống ${exactTrimmedDuration.toFixed(3)}s`);
-                
-                const tempDir = app.getPath("temp");
-                const trimmedFileName = `exact_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${path.basename(prevFile)}`;
-                const trimmedFilePath = path.join(tempDir, trimmedFileName);
-                
-                await new Promise((resolve, reject) => {
-                  ffmpeg(prevFile)
-                    .outputOptions(["-t", exactTrimmedDuration.toFixed(3)])
-                    .outputOptions(["-c", "copy"])
-                    .output(trimmedFilePath)
-                    .on("end", resolve)
-                    .on("error", reject)
-                    .run();
-                });
-                
-                finalList[finalList.length - 1] = trimmedFilePath;
-                log(`[Run ${runIndex}] Đã tạo file cắt chính xác: ${trimmedFileName}`);
-              }
-            }
-          }
-        }
-
-        // Verify final duration before adding ending
-        let verifyDuration = 0;
-        for (const file of finalList) {
-          verifyDuration += await getDuration(file);
-        }
-        log(`[Run ${runIndex}] Duration loop đã điều chỉnh: ${verifyDuration.toFixed(3)}s (mục tiêu: ${neededDuration.toFixed(3)}s)`);
-
-        // Append Ending (Input 3 remains intact)
-        finalList.push(...files3);
-      }
-    } else {
-      // No Loop Mode
-      log(
-        `[Run ${runIndex}] No Loop Mode: merging randomly selected files once.`,
-      );
+    while (currentDuration < targetMainDuration) {
+      safety++;
+      if (safety > 1000)
+        throw new Error("Safety limit reached (1000 iterations)");
 
       const files1 = getRandomFiles(input1.path, input1.count);
       const files2 = getRandomFiles(input2.path, input2.count);
 
-      if (files1.length === 0 && files2.length === 0 && files3.length === 0) {
-        throw new Error("No WAV files found in any input.");
-      }
+      if (files1.length === 0 && files2.length === 0)
+        throw new Error("Không tìm thấy file trong Input1 hoặc Input2.");
 
-      finalList.push(...files1);
-      finalList.push(...files2);
-      finalList.push(...files3);
+      for (const file of [...files1, ...files2]) {
+        const fileDuration = await getDuration(file);
+
+        if (currentDuration + fileDuration <= targetMainDuration) {
+          mainList.push(file);
+          currentDuration += fileDuration;
+        } else {
+          const remain = targetMainDuration - currentDuration;
+
+          if (remain > 0.05) {
+            const tempDir = app.getPath("temp");
+            const trimmedPath = path.join(
+              tempDir,
+              `exact_${Date.now()}_${Math.random()
+                .toString(36)
+                .slice(2)}.wav`
+            );
+
+            await new Promise((resolve, reject) => {
+              ffmpeg(file)
+                .setStartTime(0)
+                .duration(remain)
+                .audioCodec("pcm_s16le") // chính xác tuyệt đối
+                .format("wav")
+                .on("end", resolve)
+                .on("error", reject)
+                .save(trimmedPath);
+            });
+
+            mainList.push(trimmedPath);
+            currentDuration += remain;
+
+            log(
+              `[Run ${runIndex}] Cắt file ${path.basename(
+                file
+              )} lấy ${remain.toFixed(3)}s`
+            );
+          }
+
+          break;
+        }
+      }
     }
 
-    log(`[Run ${runIndex}] Total files to merge: ${finalList.length}`);
+    // ==============================
+    // 3️⃣ GHÉP ENDING
+    // ==============================
 
-    // Merge Logic
-    // Create a temporary file list for ffmpeg concat demuxer
+    finalList.push(...mainList);
+    finalList.push(...files3);
+
+    // ==============================
+    // 4️⃣ VERIFY FINAL DURATION
+    // ==============================
+
+    let verify = 0;
+    for (const f of finalList) {
+      verify += await getDuration(f);
+    }
+
+    const diff = Math.abs(verify - duration);
+
+    if (diff > 0.05) {
+      throw new Error(
+        `Duration sai lệch ${diff.toFixed(
+          3
+        )}s (target ${duration}s, actual ${verify.toFixed(3)}s)`
+      );
+    }
+
+    log(
+      `[Run ${runIndex}] Duration cuối cùng: ${verify.toFixed(
+        3
+      )}s (chuẩn)`
+    );
+
+    // ==============================
+    // 5️⃣ MERGE
+    // ==============================
+
     const listPath = path.join(
       app.getPath("temp"),
-      `concat_list_${runIndex}_${Date.now()}.txt`,
+      `concat_${runIndex}_${Date.now()}.txt`
     );
-    // Format for concat demuxer: file 'path'
+
     const listContent = finalList
       .map((f) => `file '${f.replace(/'/g, "'\\''")}'`)
       .join("\n");
+
     fs.writeFileSync(listPath, listContent);
 
-    const timestamp = Date.now();
-    const file_name = `output_${runIndex}_${timestamp}`;
-    const outputFileName = `${file_name}.wav`; // Files inside can match folder name for clarity
-    const outputPath = path.join(output, outputFileName);
-
-    // Create text log file with the list of merged files
-    const logFileName = `${file_name}.txt`; // Files inside can match folder name for clarity
-    const logFilePath = path.join(output, logFileName);
-
-    // Create log content with file order
-    let logFileContent = `=== Lần chạy ${runIndex}/${runCount} ===\n`;
-    logFileContent += `Thời gian: ${new Date().toLocaleString("vi-VN")}\n`;
-    logFileContent += `Tổng số file: ${finalList.length}\n`;
-    
-    // Calculate and display exact final duration
-    let totalFinalDuration = 0;
-    for (const file of finalList) {
-      totalFinalDuration += await getDuration(file);
-    }
-    
-    const hours = Math.floor(totalFinalDuration / 3600);
-    const minutes = Math.floor((totalFinalDuration % 3600) / 60);
-    const seconds = Math.floor(totalFinalDuration % 60);
-    const milliseconds = Math.floor((totalFinalDuration % 1) * 1000);
-    
-    logFileContent += `Duration chính xác: ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}\n`;
-    logFileContent += `Duration (giây): ${totalFinalDuration.toFixed(3)}s\n`;
-    if (loop) {
-      logFileContent += `Duration mục tiêu: ${duration.toFixed(3)}s\n`;
-      const difference = Math.abs(totalFinalDuration - duration);
-      logFileContent += `Chênh lệch: ${difference.toFixed(3)}s\n`;
-    }
-    logFileContent += `\n`;
-    logFileContent += `Danh sách file theo thứ tự:\n`;
-    logFileContent += `${"=".repeat(80)}\n\n`;
-
-    finalList.forEach((file, index) => {
-      const fileName = path.basename(file);
-      const fileDir = path.basename(path.dirname(file));
-      logFileContent += `${index + 1}. ${fileName}\n`;
-      logFileContent += `   Thư mục: ${fileDir}\n`;
-      logFileContent += `   Đường dẫn: ${file}\n\n`;
-    });
-
-    fs.writeFileSync(logFilePath, logFileContent, "utf-8");
-    log(`[Run ${runIndex}] Đã tạo file log: ${logFileName}`);
-
-    log(
-      `[Run ${runIndex}] Đang xử lý ghép... ${finalList.length} files. Output: ${outputPath}`,
-    );
+    const outputName = `output_${runIndex}_${Date.now()}.wav`;
+    const outputPath = path.join(output, outputName);
 
     await new Promise((resolve, reject) => {
       ffmpeg()
         .input(listPath)
         .inputOptions(["-f", "concat", "-safe", "0"])
-        .outputOptions(["-c", "copy", "-rf64", "always"])
+        .audioCodec("pcm_s16le")
         .format("wav")
-        .on("start", (cmd) => {
-          log(`[Run ${runIndex}] Bắt đầu xử lý...`);
+        .on("progress", (p) => {
+          if (p.percent)
+            log(`[Run ${runIndex}] ${Math.floor(p.percent)}%`);
         })
-        .on("progress", (progress) => {
-          if (progress.percent) {
-            log(`[Run ${runIndex}] Tiến độ: ${Math.floor(progress.percent)}%`);
-          }
-        })
-        .on("error", (err) => {
-          log(`[Run ${runIndex}] FFmpeg Error: ${err.message}`, "error");
-          reject(err);
-        })
-        .on("end", () => {
-          resolve();
-        })
+        .on("error", reject)
+        .on("end", resolve)
         .save(outputPath);
     });
 
-    // Cleanup
     fs.unlinkSync(listPath);
-    
-    // Cleanup any temporary trimmed/exact files
-    finalList.forEach(file => {
-      if (file.includes(app.getPath("temp")) && (file.includes("trimmed_") || file.includes("exact_"))) {
+
+    // ==============================
+    // 6️⃣ CLEAN TEMP FILES
+    // ==============================
+
+    finalList.forEach((f) => {
+      if (f.includes(app.getPath("temp")) && f.includes("exact_")) {
         try {
-          fs.unlinkSync(file);
-          log(`[Run ${runIndex}] Đã xóa file tạm: ${path.basename(file)}`);
-        } catch (err) {
-          // Ignore cleanup errors
-        }
+          fs.unlinkSync(f);
+        } catch {}
       }
     });
 
-    log(`✓ Hoàn thành lần chạy ${runIndex}: ${outputFileName}`, "success");
-    return { runIndex, outputFileName };
+    log(`✓ Hoàn thành Run ${runIndex}: ${outputName}`, "success");
+
+    return outputName;
   };
 
+  // ==========================================
+  // 🚀 MAIN
+  // ==========================================
+
   try {
-    // validate dirs
     if (
       !fs.existsSync(input1.path) ||
       !fs.existsSync(input2.path) ||
@@ -468,23 +334,22 @@ ipcMain.handle("process:start", async (event, config) => {
       throw new Error("Một hoặc nhiều thư mục đầu vào không tồn tại.");
     }
 
-    log(`Bắt đầu xử lý ${runCount} lần SONG SONG (đa luồng)...`, "info");
+    log(`Bắt đầu xử lý ${runCount} lần song song...`);
 
-    // Create array of promises for parallel processing
-    const runPromises = [];
-    for (let runIndex = 1; runIndex <= runCount; runIndex++) {
-      runPromises.push(processSingleRun(runIndex));
+    const promises = [];
+    for (let i = 1; i <= runCount; i++) {
+      promises.push(processSingleRun(i));
     }
 
-    // Execute all runs in parallel
-    const results = await Promise.all(runPromises);
+    await Promise.all(promises);
 
     sender.send(
       "process:complete",
-      `Thành công! Đã tạo ${runCount} output trong ${output}`,
+      `Thành công! Đã tạo ${runCount} file output.`
     );
   } catch (err) {
     log(`Error: ${err.message}`, "error");
     sender.send("process:error", err.message);
   }
 });
+
