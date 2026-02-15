@@ -90,20 +90,22 @@ ipcMain.handle("settings:save", async (event, settings) => {
 function getRandomFiles(dir, count) {
   try {
     if (!fs.existsSync(dir)) return [];
+
     const files = fs
       .readdirSync(dir)
       .filter((f) => f.toLowerCase().endsWith(".wav"));
+
     if (files.length === 0) return [];
 
-    const selected = [];
-    // Simple random sampling with replacement or without?
-    // Usually "random X songs" implies picking X unique if possible, or repeats if count > total.
-    // Let's do simple random pick.
-    for (let i = 0; i < count; i++) {
+    const selected = new Set();
+
+    while (selected.size < Math.min(count, files.length)) {
       const randomIndex = Math.floor(Math.random() * files.length);
-      selected.push(path.join(dir, files[randomIndex]));
+      selected.add(files[randomIndex]);
     }
-    return selected;
+
+    return [...selected].map((f) => path.join(dir, f));
+
   } catch (err) {
     console.error(`Error reading dir ${dir}:`, err);
     return [];
@@ -363,20 +365,13 @@ ipcMain.handle("process:start", async (event, config) => {
     fs.writeFileSync(listPath, listContent);
 
     const timestamp = Date.now();
-    const folderName = `output_${runIndex}_${timestamp}`;
-    const folderPath = path.join(output, folderName);
-
-    // Create the subdirectory if it doesn't exist
-    if (!fs.existsSync(folderPath)) {
-      fs.mkdirSync(folderPath, { recursive: true });
-    }
-
-    const outputFileName = `${folderName}.wav`; // Files inside can match folder name for clarity
-    const outputPath = path.join(folderPath, outputFileName);
+    const file_name = `output_${runIndex}_${timestamp}`;
+    const outputFileName = `${file_name}.wav`; // Files inside can match folder name for clarity
+    const outputPath = path.join(output, outputFileName);
 
     // Create text log file with the list of merged files
-    const logFileName = `${folderName}.txt`;
-    const logFilePath = path.join(folderPath, logFileName);
+    const logFileName = `${file_name}.txt`; // Files inside can match folder name for clarity
+    const logFilePath = path.join(output, logFileName);
 
     // Create log content with file order
     let logFileContent = `=== Lần chạy ${runIndex}/${runCount} ===\n`;
