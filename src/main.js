@@ -93,7 +93,7 @@ function getRandomFiles(dir, count) {
 
     const files = fs
       .readdirSync(dir)
-      .filter((f) => f.toLowerCase().endsWith(".wav"));
+      .filter((f) => f.toLowerCase().endsWith(".mp3"));
 
     if (files.length === 0) return [];
 
@@ -210,15 +210,15 @@ ipcMain.handle("process:start", async (event, config) => {
                 tempDir,
                 `exact_${Date.now()}_${Math.random()
                   .toString(36)
-                  .slice(2)}.wav`
+                  .slice(2)}.mp3`
               );
 
               await new Promise((resolve, reject) => {
                 ffmpeg(file)
                   .setStartTime(0)
                   .duration(remain)
-                  .audioCodec("pcm_s16le")
-                  .format("wav")
+                  .audioCodec("libmp3lame")
+                  .format("mp3")
                   .on("end", resolve)
                   .on("error", reject)
                   .save(trimmedPath);
@@ -261,15 +261,15 @@ ipcMain.handle("process:start", async (event, config) => {
               tempDir,
               `exact_${Date.now()}_${Math.random()
                 .toString(36)
-                .slice(2)}.wav`
+                .slice(2)}.mp3`
             );
 
             await new Promise((resolve, reject) => {
               ffmpeg(file)
                 .setStartTime(0)
                 .duration(remain)
-                .audioCodec("pcm_s16le")
-                .format("wav")
+                .audioCodec("libmp3lame")
+                .format("mp3")
                 .on("end", resolve)
                 .on("error", reject)
                 .save(trimmedPath);
@@ -337,15 +337,15 @@ ipcMain.handle("process:start", async (event, config) => {
 
     fs.writeFileSync(listPath, listContent);
 
-    const outputName = `output_${runIndex}_${Date.now()}.wav`;
+    const outputName = `output_${runIndex}_${Date.now()}.mp3`;
     const outputPath = path.join(output, outputName);
 
     await new Promise((resolve, reject) => {
       ffmpeg()
         .input(listPath)
         .inputOptions(["-f", "concat", "-safe", "0"])
-        .audioCodec("pcm_s16le")
-        .format("wav")
+        .audioCodec("libmp3lame")
+        .format("mp3")
         .on("progress", (p) => {
           if (p.percent)
             log(`[Run ${runIndex}] ${Math.floor(p.percent)}%`);
@@ -361,7 +361,7 @@ ipcMain.handle("process:start", async (event, config) => {
     // 📝 EXPORT TXT DANH SÁCH GHÉP
     // ==============================
 
-    const logFileName = outputName.replace(".wav", "_log.txt");
+    const logFileName = outputName.replace(".mp3", "_log.txt");
     const logFilePath = path.join(output, logFileName);
 
     let logFileContent = "";
@@ -388,7 +388,7 @@ ipcMain.handle("process:start", async (event, config) => {
 
     fs.writeFileSync(logFilePath, logFileContent, "utf-8");
 
-    log(`[Run ${runIndex}] Đã tạo file log: ${logFileName}`);                                                             
+    log(`[Run ${runIndex}] Đã tạo file log: ${logFileName}`);
 
     // ==============================
     // 6️⃣ CLEAN TEMP FILES
@@ -398,7 +398,7 @@ ipcMain.handle("process:start", async (event, config) => {
       if (f.includes(app.getPath("temp")) && f.includes("exact_")) {
         try {
           fs.unlinkSync(f);
-        } catch {}
+        } catch { }
       }
     });
 
