@@ -112,13 +112,53 @@ function getRandomFiles(dir, count) {
   }
 }
 
-// Helper: Get Duration of a file (Promisified)
+// Helper: Convert MP3 to WAV for precise duration handling
+function convertToWav(inputPath) {
+  return new Promise((resolve, reject) => {
+    const tempDir = app.getPath("temp");
+    const wavPath = path.join(
+      tempDir,
+      `wav_${Date.now()}_${Math.random().toString(36).slice(2)}.wav`
+    );
+
+    ffmpeg(inputPath)
+      .audioCodec("pcm_s16le")
+      .audioFrequency(44100)
+      .audioChannels(2)
+      .format("wav")
+      .on("end", () => resolve(wavPath))
+      .on("error", reject)
+      .save(wavPath);
+  });
+}
+
+// Helper: Get Duration of a file (Promisified) - More precise with WAV
 function getDuration(filePath) {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(filePath, (err, metadata) => {
       if (err) return resolve(0); // If error, assume 0 to not break loop
       resolve(metadata.format.duration || 0);
     });
+  });
+}
+
+// Helper: Trim WAV file to exact duration
+function trimWavFile(inputPath, duration) {
+  return new Promise((resolve, reject) => {
+    const tempDir = app.getPath("temp");
+    const trimmedPath = path.join(
+      tempDir,
+      `trimmed_${Date.now()}_${Math.random().toString(36).slice(2)}.wav`
+    );
+
+    ffmpeg(inputPath)
+      .setStartTime(0)
+      .duration(duration)
+      .audioCodec("pcm_s16le")
+      .format("wav")
+      .on("end", () => resolve(trimmedPath))
+      .on("error", reject)
+      .save(trimmedPath);
   });
 }
 
@@ -144,18 +184,25 @@ ipcMain.handle("process:start", async (event, config) => {
     log(`\n=== Bắt đầu lần chạy ${runIndex}/${runCount} ===`);
 
     const finalList = [];
+    const wavFilesList = []; // Track WAV files for cleanup
 
     // ==============================
-    // 1️⃣ LẤY INPUT 3 (ENDING)
+    // 1️⃣ LẤY INPUT 3 (ENDING) - CONVERT TO WAV
     // ==============================
 
     const files3 = getRandomFiles(input3.path, input3.count);
     if (files3.length === 0)
       throw new Error("Không tìm thấy file trong Input 3.");
 
+    log(`[Run ${runIndex}] Đang chuyển đổi Input3 files sang WAV...`);
+    const wavFiles3 = [];
     let duration3 = 0;
+    
     for (const f of files3) {
-      duration3 += await getDuration(f);
+      const wavFile = await convertToWav(f);
+      wavFilesList.push(wavFile);
+      wavFiles3.push(wavFile);
+      duration3 += await getDuration(wavFile);
     }
 
     if (duration3 > duration) {
@@ -175,7 +222,7 @@ ipcMain.handle("process:start", async (event, config) => {
     );
 
     // ==============================
-    // 2️⃣ BUILD MAIN LIST (1+2)
+    // 2️⃣ BUILD MAIN LIST (1+2) - CONVERT TO WAV AND HANDLE
     // ==============================
 
     let mainList = [];
@@ -196,35 +243,23 @@ ipcMain.handle("process:start", async (event, config) => {
           throw new Error("Không tìm thấy file trong Input1 hoặc Input2.");
 
         for (const file of [...files1, ...files2]) {
-          const fileDuration = await getDuration(file);
+          // Convert to WAV first
+          const wavFile = await convertToWav(file);
+          wavFilesList.push(wavFile);
+          
+          const fileDuration = await getDuration(wavFile);
 
           if (currentDuration + fileDuration <= targetMainDuration) {
-            mainList.push(file);
+            mainList.push(wavFile);
             currentDuration += fileDuration;
           } else {
             const remain = targetMainDuration - currentDuration;
 
-            if (remain > 0.05) {
-              const tempDir = app.getPath("temp");
-              const trimmedPath = path.join(
-                tempDir,
-                `exact_${Date.now()}_${Math.random()
-                  .toString(36)
-                  .slice(2)}.mp3`
-              );
-
-              await new Promise((resolve, reject) => {
-                ffmpeg(file)
-                  .setStartTime(0)
-                  .duration(remain)
-                  .audioCodec("libmp3lame")
-                  .format("mp3")
-                  .on("end", resolve)
-                  .on("error", reject)
-                  .save(trimmedPath);
-              });
-
-              mainList.push(trimmedPath);
+            if (remain > 0.001) { // More precise threshold for WAV
+              const trimmedWav = await trimWavFile(wavFile, remain);
+              wavFilesList.push(trimmedWav);
+              
+              mainList.push(trimmedWav);
               currentDuration += remain;
 
               log(
@@ -247,35 +282,23 @@ ipcMain.handle("process:start", async (event, config) => {
         throw new Error("Không tìm thấy file trong Input1 hoặc Input2.");
 
       for (const file of [...files1, ...files2]) {
-        const fileDuration = await getDuration(file);
+        // Convert to WAV first
+        const wavFile = await convertToWav(file);
+        wavFilesList.push(wavFile);
+        
+        const fileDuration = await getDuration(wavFile);
 
         if (currentDuration + fileDuration <= targetMainDuration) {
-          mainList.push(file);
+          mainList.push(wavFile);
           currentDuration += fileDuration;
         } else {
           const remain = targetMainDuration - currentDuration;
 
-          if (remain > 0.05) {
-            const tempDir = app.getPath("temp");
-            const trimmedPath = path.join(
-              tempDir,
-              `exact_${Date.now()}_${Math.random()
-                .toString(36)
-                .slice(2)}.mp3`
-            );
-
-            await new Promise((resolve, reject) => {
-              ffmpeg(file)
-                .setStartTime(0)
-                .duration(remain)
-                .audioCodec("libmp3lame")
-                .format("mp3")
-                .on("end", resolve)
-                .on("error", reject)
-                .save(trimmedPath);
-            });
-
-            mainList.push(trimmedPath);
+          if (remain > 0.001) { // More precise threshold for WAV
+            const trimmedWav = await trimWavFile(wavFile, remain);
+            wavFilesList.push(trimmedWav);
+            
+            mainList.push(trimmedWav);
             currentDuration += remain;
 
             log(
@@ -295,7 +318,7 @@ ipcMain.handle("process:start", async (event, config) => {
     // ==============================
 
     finalList.push(...mainList);
-    finalList.push(...files3);
+    finalList.push(...wavFiles3);
 
     // ==============================
     // 4️⃣ VERIFY FINAL DURATION
@@ -308,12 +331,21 @@ ipcMain.handle("process:start", async (event, config) => {
 
     const diff = Math.abs(verify - duration);
 
-    if (diff > 0.05) {
-      throw new Error(
-        `Duration sai lệch ${diff.toFixed(
-          3
-        )}s (target ${duration}s, actual ${verify.toFixed(3)}s)`
-      );
+    if (diff > 0.001) { // More strict tolerance for WAV
+      // Trim last file if possible
+      const lastFile = finalList[finalList.length - 1];
+      const lastDuration = await getDuration(lastFile);
+
+      if (lastDuration > diff) {
+        const trimmedFile = await trimWavFile(lastFile, lastDuration - diff);
+        finalList[finalList.length - 1] = trimmedFile;
+      } else {
+        log(
+          `[Run ${runIndex}] Cảnh báo: Không thể cắt file cuối để đạt đúng duration. Sai số: ${diff.toFixed(
+            3
+          )}s`
+        );
+      }
     }
 
     log(
@@ -323,7 +355,7 @@ ipcMain.handle("process:start", async (event, config) => {
     );
 
     // ==============================
-    // 5️⃣ MERGE
+    // 5️⃣ MERGE WAV FILES
     // ==============================
 
     const listPath = path.join(
@@ -337,18 +369,42 @@ ipcMain.handle("process:start", async (event, config) => {
 
     fs.writeFileSync(listPath, listContent);
 
-    const outputName = `output_${runIndex}_${Date.now()}.mp3`;
-    const outputPath = path.join(output, outputName);
+    // First create merged WAV file
+    const tempWavOutput = path.join(
+      app.getPath("temp"),
+      `merged_${runIndex}_${Date.now()}.wav`
+    );
 
     await new Promise((resolve, reject) => {
       ffmpeg()
         .input(listPath)
         .inputOptions(["-f", "concat", "-safe", "0"])
+        .audioCodec("pcm_s16le")
+        .format("wav")
+        .on("progress", (p) => {
+          if (p.percent)
+            log(`[Run ${runIndex}] Merging WAV: ${Math.floor(p.percent)}%`);
+        })
+        .on("error", reject)
+        .on("end", resolve)
+        .save(tempWavOutput);
+    });
+
+    // ==============================
+    // 6️⃣ CONVERT FINAL WAV TO MP3
+    // ==============================
+
+    const outputName = `output_${runIndex}_${Date.now()}.mp3`;
+    const outputPath = path.join(output, outputName);
+
+    await new Promise((resolve, reject) => {
+      ffmpeg(tempWavOutput)
         .audioCodec("libmp3lame")
+        .audioBitrate("320k")
         .format("mp3")
         .on("progress", (p) => {
           if (p.percent)
-            log(`[Run ${runIndex}] ${Math.floor(p.percent)}%`);
+            log(`[Run ${runIndex}] Converting to MP3: ${Math.floor(p.percent)}%`);
         })
         .on("error", reject)
         .on("end", resolve)
@@ -356,6 +412,7 @@ ipcMain.handle("process:start", async (event, config) => {
     });
 
     fs.unlinkSync(listPath);
+    fs.unlinkSync(tempWavOutput);
 
     // ==============================
     // 📝 EXPORT TXT DANH SÁCH GHÉP
@@ -371,10 +428,11 @@ ipcMain.handle("process:start", async (event, config) => {
     logFileContent += `Output file: ${outputName}\n`;
     logFileContent += `Tổng số file ghép: ${finalList.length}\n`;
     logFileContent += `Duration target: ${duration}s\n`;
+    logFileContent += `Duration actual: ${verify.toFixed(3)}s\n`;
     logFileContent += `${"=".repeat(80)}\n`;
 
     logFileContent += `\n`;
-    logFileContent += `Danh sách file theo thứ tự:\n`;
+    logFileContent += `Danh sách file theo thứ tự (WAV processing):\n`;
     logFileContent += `${"=".repeat(80)}\n\n`;
 
     finalList.forEach((file, index) => {
@@ -391,14 +449,16 @@ ipcMain.handle("process:start", async (event, config) => {
     log(`[Run ${runIndex}] Đã tạo file log: ${logFileName}`);
 
     // ==============================
-    // 6️⃣ CLEAN TEMP FILES
+    // 7️⃣ CLEAN TEMP FILES
     // ==============================
 
-    finalList.forEach((f) => {
-      if (f.includes(app.getPath("temp")) && f.includes("exact_")) {
-        try {
+    wavFilesList.forEach((f) => {
+      try {
+        if (fs.existsSync(f)) {
           fs.unlinkSync(f);
-        } catch { }
+        }
+      } catch (err) {
+        console.error(`Error cleaning up ${f}:`, err);
       }
     });
 
