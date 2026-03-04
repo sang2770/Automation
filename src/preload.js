@@ -7,5 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onComplete: (callback) => ipcRenderer.on('process:complete', callback),
     onError: (callback) => ipcRenderer.on('process:error', callback),
     loadSettings: () => ipcRenderer.invoke('settings:load'),
-    saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings)
+    saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings),
+    getDeviceId: () => ipcRenderer.invoke('device:getId'),
+    checkActivation: (deviceId) => ipcRenderer.invoke('activation:check', deviceId)
 });

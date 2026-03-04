@@ -4,6 +4,8 @@ const fs = require("fs");
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegPath = require("ffmpeg-static");
 const ffprobePath = require("ffprobe-static").path;
+const { machineId } = require("node-machine-id");
+const axios = require("axios");
 
 function resolveUnpacked(p) {
   if (p.includes("app.asar")) {
@@ -105,7 +107,6 @@ function getRandomFiles(dir, count) {
     }
 
     return [...selected].map((f) => path.join(dir, f));
-
   } catch (err) {
     console.error(`Error reading dir ${dir}:`, err);
     return [];
@@ -118,7 +119,7 @@ function convertToWav(inputPath) {
     const tempDir = app.getPath("temp");
     const wavPath = path.join(
       tempDir,
-      `wav_${Date.now()}_${Math.random().toString(36).slice(2)}.wav`
+      `wav_${Date.now()}_${Math.random().toString(36).slice(2)}.wav`,
     );
 
     ffmpeg(inputPath)
@@ -148,7 +149,7 @@ function trimWavFile(inputPath, duration) {
     const tempDir = app.getPath("temp");
     const trimmedPath = path.join(
       tempDir,
-      `trimmed_${Date.now()}_${Math.random().toString(36).slice(2)}.wav`
+      `trimmed_${Date.now()}_${Math.random().toString(36).slice(2)}.wav`,
     );
 
     ffmpeg(inputPath)
@@ -161,7 +162,6 @@ function trimWavFile(inputPath, duration) {
       .save(trimmedPath);
   });
 }
-
 
 ipcMain.handle("process:start", async (event, config) => {
   const {
@@ -197,7 +197,7 @@ ipcMain.handle("process:start", async (event, config) => {
     log(`[Run ${runIndex}] Đang chuyển đổi Input3 files sang WAV...`);
     const wavFiles3 = [];
     let duration3 = 0;
-    
+
     for (const f of files3) {
       const wavFile = await convertToWav(f);
       wavFilesList.push(wavFile);
@@ -208,8 +208,8 @@ ipcMain.handle("process:start", async (event, config) => {
     if (duration3 > duration) {
       throw new Error(
         `Input3 (${duration3.toFixed(
-          3
-        )}s) dài hơn duration yêu cầu (${duration}s). Không được cắt Input3.`
+          3,
+        )}s) dài hơn duration yêu cầu (${duration}s). Không được cắt Input3.`,
       );
     }
 
@@ -217,8 +217,8 @@ ipcMain.handle("process:start", async (event, config) => {
 
     log(
       `[Run ${runIndex}] Input3: ${duration3.toFixed(
-        3
-      )}s | Cần từ Input1+2: ${targetMainDuration.toFixed(3)}s`
+        3,
+      )}s | Cần từ Input1+2: ${targetMainDuration.toFixed(3)}s`,
     );
 
     // ==============================
@@ -246,7 +246,7 @@ ipcMain.handle("process:start", async (event, config) => {
           // Convert to WAV first
           const wavFile = await convertToWav(file);
           wavFilesList.push(wavFile);
-          
+
           const fileDuration = await getDuration(wavFile);
 
           if (currentDuration + fileDuration <= targetMainDuration) {
@@ -255,17 +255,18 @@ ipcMain.handle("process:start", async (event, config) => {
           } else {
             const remain = targetMainDuration - currentDuration;
 
-            if (remain > 0.001) { // More precise threshold for WAV
+            if (remain > 0.001) {
+              // More precise threshold for WAV
               const trimmedWav = await trimWavFile(wavFile, remain);
               wavFilesList.push(trimmedWav);
-              
+
               mainList.push(trimmedWav);
               currentDuration += remain;
 
               log(
                 `[Run ${runIndex}] Cắt file ${path.basename(
-                  file
-                )} lấy ${remain.toFixed(3)}s`
+                  file,
+                )} lấy ${remain.toFixed(3)}s`,
               );
             }
 
@@ -285,7 +286,7 @@ ipcMain.handle("process:start", async (event, config) => {
         // Convert to WAV first
         const wavFile = await convertToWav(file);
         wavFilesList.push(wavFile);
-        
+
         const fileDuration = await getDuration(wavFile);
 
         if (currentDuration + fileDuration <= targetMainDuration) {
@@ -294,17 +295,18 @@ ipcMain.handle("process:start", async (event, config) => {
         } else {
           const remain = targetMainDuration - currentDuration;
 
-          if (remain > 0.001) { // More precise threshold for WAV
+          if (remain > 0.001) {
+            // More precise threshold for WAV
             const trimmedWav = await trimWavFile(wavFile, remain);
             wavFilesList.push(trimmedWav);
-            
+
             mainList.push(trimmedWav);
             currentDuration += remain;
 
             log(
               `[Run ${runIndex}] Cắt file ${path.basename(
-                file
-              )} lấy ${remain.toFixed(3)}s`
+                file,
+              )} lấy ${remain.toFixed(3)}s`,
             );
           }
 
@@ -331,7 +333,8 @@ ipcMain.handle("process:start", async (event, config) => {
 
     const diff = Math.abs(verify - duration);
 
-    if (diff > 0.001) { // More strict tolerance for WAV
+    if (diff > 0.001) {
+      // More strict tolerance for WAV
       // Trim last file if possible
       const lastFile = finalList[finalList.length - 1];
       const lastDuration = await getDuration(lastFile);
@@ -342,17 +345,13 @@ ipcMain.handle("process:start", async (event, config) => {
       } else {
         log(
           `[Run ${runIndex}] Cảnh báo: Không thể cắt file cuối để đạt đúng duration. Sai số: ${diff.toFixed(
-            3
-          )}s`
+            3,
+          )}s`,
         );
       }
     }
 
-    log(
-      `[Run ${runIndex}] Duration cuối cùng: ${verify.toFixed(
-        3
-      )}s (chuẩn)`
-    );
+    log(`[Run ${runIndex}] Duration cuối cùng: ${verify.toFixed(3)}s (chuẩn)`);
 
     // ==============================
     // 5️⃣ MERGE WAV FILES
@@ -360,7 +359,7 @@ ipcMain.handle("process:start", async (event, config) => {
 
     const listPath = path.join(
       app.getPath("temp"),
-      `concat_${runIndex}_${Date.now()}.txt`
+      `concat_${runIndex}_${Date.now()}.txt`,
     );
 
     const listContent = finalList
@@ -372,7 +371,7 @@ ipcMain.handle("process:start", async (event, config) => {
     // First create merged WAV file
     const tempWavOutput = path.join(
       app.getPath("temp"),
-      `merged_${runIndex}_${Date.now()}.wav`
+      `merged_${runIndex}_${Date.now()}.wav`,
     );
 
     await new Promise((resolve, reject) => {
@@ -404,7 +403,9 @@ ipcMain.handle("process:start", async (event, config) => {
         .format("mp3")
         .on("progress", (p) => {
           if (p.percent)
-            log(`[Run ${runIndex}] Converting to MP3: ${Math.floor(p.percent)}%`);
+            log(
+              `[Run ${runIndex}] Converting to MP3: ${Math.floor(p.percent)}%`,
+            );
         })
         .on("error", reject)
         .on("end", resolve)
@@ -491,7 +492,7 @@ ipcMain.handle("process:start", async (event, config) => {
 
     sender.send(
       "process:complete",
-      `Thành công! Đã tạo ${runCount} file output.`
+      `Thành công! Đã tạo ${runCount} file output.`,
     );
   } catch (err) {
     log(`Error: ${err.message}`, "error");
@@ -499,4 +500,99 @@ ipcMain.handle("process:start", async (event, config) => {
   }
 });
 
+// Device ID and Activation
+ipcMain.handle("device:getId", async () => {
+  try {
+    const id = await machineId();
+    return id;
+  } catch (error) {
+    console.error("Error getting device ID:", error);
+    return null;
+  }
+});
 
+ipcMain.handle("activation:check", async (event, deviceId) => {
+  try {
+    // Google Sheets CSV export URL
+    const SHEET_ID = "1ZBWgZXISKT_dZGXlnp9ibB2PpypQepAJCppg3UEjl3k";
+    const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+
+    const response = await axios.get(SHEET_CSV_URL, {
+      timeout: 10000,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    if (response.data && typeof response.data === "string") {
+      // Parse CSV data
+      const csvLines = response.data.split("\n");
+
+      // Skip header row, check each line for device ID
+      for (let i = 1; i < csvLines.length; i++) {
+        const line = csvLines[i].trim();
+        if (!line) continue;
+
+        // Parse CSV row (assuming: Device ID, Expiry Date)
+        const columns = line
+          .split(",")
+          .map((col) => col.replace(/"/g, "").trim());
+        const sheetDeviceId = columns[0];
+        const expiryDate = columns[2];
+
+        if (sheetDeviceId === deviceId) {
+          if (expiryDate && expiryDate !== "") {
+            const expiry = new Date(expiryDate);
+            const now = new Date();
+            if (now > expiry) {
+              return {
+                active: false,
+                message: "Thiết bị đã hết hạn kích hoạt",
+              };
+            }
+          }
+
+          return {
+            active: true,
+            message: "Thiết bị đã được kích hoạt",
+          };
+        }
+      }
+
+      return {
+        active: false,
+        message: "Thiết bị không có trong danh sách kích hoạt",
+      };
+    } else {
+      return {
+        active: false,
+        message:
+          "Không thể đọc dữ liệu từ Google Sheet. Vui lòng kiểm tra quyền truy cập.",
+      };
+    }
+  } catch (error) {
+    console.error("Error checking activation:", error);
+
+    // Check if it's a permission/access error
+    if (error.response) {
+      if (error.response.status === 403) {
+        return {
+          active: false,
+          message:
+            "Google Sheet chưa được chia sẻ công khai. Vui lòng liên hệ quản trị viên.",
+        };
+      } else if (error.response.status === 404) {
+        return {
+          active: false,
+          message: "Không tìm thấy Google Sheet. Vui lòng kiểm tra link.",
+        };
+      }
+    }
+
+    return {
+      active: false,
+      message: "Không thể kiểm tra kích hoạt. Vui lòng kiểm tra kết nối mạng.",
+    };
+  }
+});

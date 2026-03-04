@@ -46,6 +46,7 @@ h1 {
     margin: 0;
     font-size: 2rem;
     background: linear-gradient(90deg, #e94560, #ff6b6b);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -266,3 +267,123 @@ input:checked + .slider:before {
 .log-success { color: var(--success-color); }
 .log-error { color: var(--danger-color); }
 .log-warn { color: var(--warning-color); }
+
+/* Activation Interface Styles */
+.activation-info {
+    margin-top: 15px;
+    padding: 15px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.device-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.device-label {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.device-id {
+    font-family: 'Courier New', monospace;
+    background: var(--input-bg);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    border: 1px solid var(--glass-border);
+}
+
+.btn-copy {
+    background: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.btn-copy:hover {
+    background: #1a5490;
+    transform: translateY(-1px);
+}
+
+.activation-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-active {
+    color: var(--success-color);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.status-active::before {
+    content: "✓";
+    background: var(--success-color);
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+}
+
+.status-inactive {
+    color: var(--danger-color);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.status-inactive::before {
+    content: "✕";
+    background: var(--danger-color);
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+}
+
+.btn-check {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.btn-check:hover {
+    background: #d63851;
+    transform: translateY(-1px);
+}
+
+.btn-check:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}

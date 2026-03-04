@@ -24,12 +24,21 @@ const runCountInput = document.getElementById('run-count');
 const btnProcess = document.getElementById('btn-process');
 const logContent = document.getElementById('log-content');
 
+// Device ID and Activation Elements
+const deviceIdElement = document.getElementById('device-id');
+const copyDeviceIdBtn = document.getElementById('copy-device-id');
+const activationStatus = document.getElementById('activation-status');
+const checkActivationBtn = document.getElementById('check-activation');
+
 let paths = {
     input1: null,
     input2: null,
     input3: null,
     output: null
 };
+
+let currentDeviceId = null;
+let isActivated = false;
 
 // UI Helpers
 function log(msg, type = 'info') {
@@ -55,6 +64,12 @@ loopMode.addEventListener('change', (e) => {
 });
 
 btnProcess.addEventListener('click', async () => {
+    // Check activation first
+    if (!isActivated) {
+        log('Lỗi: Phần mềm chưa được kích hoạt. Vui lòng kiểm tra kích hoạt trước.', 'error');
+        return;
+    }
+
     // Validate
     const missing = [];
     if (!paths.input1) missing.push("Đầu vào 1");
@@ -96,6 +111,81 @@ btnProcess.addEventListener('click', async () => {
         btnProcess.textContent = 'Bắt đầu Xử lý';
     }
 });
+
+// Device ID and Activation Functions
+async function initializeDeviceId() {
+    try {
+        log('Đang tải ID thiết bị...', 'info');
+        currentDeviceId = await window.electronAPI.getDeviceId();
+        if (currentDeviceId) {
+            deviceIdElement.textContent = currentDeviceId.substring(0, 12) + '...';
+            deviceIdElement.title = currentDeviceId; // Show full ID on hover
+            log(`ID thiết bị: ${currentDeviceId}`, 'success');
+            // Check activation status on startup
+            await checkActivationStatus();
+            copyDeviceIdBtn.addEventListener('click', copyDeviceIdToClipboard);
+            checkActivationBtn.addEventListener('click', checkActivationStatus);
+        } else {
+            deviceIdElement.textContent = 'Lỗi tải ID';
+            log('Không thể tải ID thiết bị', 'error');
+        }
+    } catch (error) {
+        console.error('Error initializing device ID:', error);
+        deviceIdElement.textContent = 'Lỗi tải ID';
+        log('Lỗi khởi tạo ID thiết bị', 'error');
+    }
+}
+
+async function checkActivationStatus() {
+    if (!currentDeviceId) {
+        log('Không có ID thiết bị để kiểm tra', 'error');
+        return;
+    }
+
+    try {
+        checkActivationBtn.disabled = true;
+        checkActivationBtn.textContent = 'Đang kiểm tra...';
+        
+        log('Đang kiểm tra trạng thái kích hoạt...', 'info');
+        const result = await window.electronAPI.checkActivation(currentDeviceId);
+        
+        if (result.active) {
+            isActivated = true;
+            activationStatus.textContent = 'Đã kích hoạt';
+            activationStatus.className = 'status-active';
+            log(result.message, 'success');
+        } else {
+            isActivated = false;
+            activationStatus.textContent = 'Chưa kích hoạt';
+            activationStatus.className = 'status-inactive';
+            log(result.message, 'warning');
+        }
+    } catch (error) {
+        console.error('Error checking activation:', error);
+        isActivated = false;
+        activationStatus.textContent = 'Lỗi kiểm tra';
+        activationStatus.className = 'status-inactive';
+        log('Lỗi khi kiểm tra kích hoạt', 'error');
+    } finally {
+        checkActivationBtn.disabled = false;
+        checkActivationBtn.textContent = 'Kiểm tra';
+    }
+}
+
+function copyDeviceIdToClipboard() {
+    if (currentDeviceId) {
+        navigator.clipboard.writeText(currentDeviceId).then(() => {
+            log('Đã sao chép ID thiết bị vào clipboard', 'success');
+            copyDeviceIdBtn.textContent = 'Đã sao chép';
+            setTimeout(() => {
+                copyDeviceIdBtn.textContent = 'Sao chép';
+            }, 2000);
+        }).catch((error) => {
+            console.error('Error copying to clipboard:', error);
+            log('Lỗi sao chép ID thiết bị', 'error');
+        });
+    }
+}
 
 // Settings Logic
 function getSettings() {
@@ -193,6 +283,7 @@ async function selectFolder(key, displayElement) {
 
 // Initial Load
 loadSettings();
+initializeDeviceId();
 
 // IPC Listeners
 window.electronAPI.onLog((event, msg) => {
