@@ -10,7 +10,23 @@ const btnInput3 = document.getElementById('btn-input3');
 const pathInput3 = document.getElementById('path-input3');
 const countInput3 = document.getElementById('count-input3');
 
+// Output 2 elements
+const btnOutput2Input1 = document.getElementById('btn-output2-input1');
+const pathOutput2Input1 = document.getElementById('path-output2-input1');
+const countOutput2Input1 = document.getElementById('count-output2-input1');
+
+const btnOutput2Input2 = document.getElementById('btn-output2-input2');
+const pathOutput2Input2 = document.getElementById('path-output2-input2');
+const countOutput2Input2 = document.getElementById('count-output2-input2');
+
+const btnOutput2Input3 = document.getElementById('btn-output2-input3');
+const pathOutput2Input3 = document.getElementById('path-output2-input3');
+const countOutput2Input3 = document.getElementById('count-output2-input3');
+
 const loopMode = document.getElementById('loop-mode');
+const normalMode = document.getElementById('normal-mode');
+const enableOutput2 = document.getElementById('enable-output2');
+const output2Group = document.getElementById('output2-group');
 const durationSettings = document.getElementById('duration-settings');
 const minutesInput = document.getElementById('minutes');
 const hoursInput = document.getElementById('hours');
@@ -34,7 +50,10 @@ let paths = {
     input1: null,
     input2: null,
     input3: null,
-    output: null
+    output: null,
+    output2Input1: null,
+    output2Input2: null,
+    output2Input3: null
 };
 
 let currentDeviceId = null;
@@ -55,11 +74,39 @@ btnInput2.addEventListener('click', () => selectFolder('input2', pathInput2));
 btnInput3.addEventListener('click', () => selectFolder('input3', pathInput3));
 btnOutput.addEventListener('click', () => selectFolder('output', pathOutput));
 
+// Output 2 event listeners
+btnOutput2Input1.addEventListener('click', () => selectFolder('output2Input1', pathOutput2Input1));
+btnOutput2Input2.addEventListener('click', () => selectFolder('output2Input2', pathOutput2Input2));
+btnOutput2Input3.addEventListener('click', () => selectFolder('output2Input3', pathOutput2Input3));
+
+// Mode change listeners
 loopMode.addEventListener('change', (e) => {
     if (e.target.checked) {
         durationSettings.classList.remove('hidden');
+        // Disable Output 2 when loop mode is enabled
+        enableOutput2.disabled = true;
+        enableOutput2.checked = false;
+        output2Group.classList.add('hidden');
     } else {
+        // Enable Output 2 when loop mode is disabled
+        enableOutput2.disabled = false;
+    }
+});
+
+normalMode.addEventListener('change', (e) => {
+    if (e.target.checked) {
         durationSettings.classList.add('hidden');
+        // Enable Output 2 when normal mode is enabled
+        enableOutput2.disabled = false;
+    }
+});
+
+// Output 2 toggle listener
+enableOutput2.addEventListener('change', (e) => {
+    if (e.target.checked) {
+        output2Group.classList.remove('hidden');
+    } else {
+        output2Group.classList.add('hidden');
     }
 });
 
@@ -69,13 +116,25 @@ btnProcess.addEventListener('click', async () => {
         log('Lỗi: Phần mềm chưa được kích hoạt. Vui lòng kiểm tra kích hoạt trước.', 'error');
         return;
     }
+    const isLoopMode = loopMode.checked;
 
-    // Validate
+    // Validate main inputs
     const missing = [];
     if (!paths.input1) missing.push("Đầu vào 1");
     if (!paths.input2) missing.push("Đầu vào 2");
     if (!paths.input3) missing.push("Đầu vào 3");
     if (!paths.output) missing.push("Đầu ra");
+
+    // Validate Output 2 inputs if enabled
+    if (enableOutput2.checked) {
+        if (isLoopMode) {
+            log('Lỗi: Output 2 chỉ hoạt động với Chế độ Không Lặp.', 'error');
+            return;
+        }
+        if (!paths.output2Input1) missing.push("Đầu vào 2.1");
+        if (!paths.output2Input2) missing.push("Đầu vào 2.2");
+        if (!paths.output2Input3) missing.push("Đầu vào 2.3");
+    }
 
     if (missing.length > 0) {
         log(`Lỗi: Vui lòng chọn thêm: ${missing.join(', ')}`, 'error');
@@ -89,10 +148,17 @@ btnProcess.addEventListener('click', async () => {
         input2: { path: paths.input2, count: parseInt(countInput2.value) || 1 },
         input3: { path: paths.input3, count: parseInt(countInput3.value) || 1 },
         output: paths.output,
-        loop: loopMode.checked,
+        loop: isLoopMode,
         duration: (parseInt(minutesInput.value) || 0) * 60 + (parseInt(hoursInput.value) || 0) * 3600 + (parseInt(secondsInput.value) || 0),
-        runCount: runCount
+        runCount: runCount,
+        enableOutput2: enableOutput2.checked
     };
+
+    if (enableOutput2.checked) {
+        config.output2Input1 = { path: paths.output2Input1, count: parseInt(countOutput2Input1.value) || 1 };
+        config.output2Input2 = { path: paths.output2Input2, count: parseInt(countOutput2Input2.value) || 1 };
+        config.output2Input3 = { path: paths.output2Input3, count: parseInt(countOutput2Input3.value) || 1 };
+    }
 
     if (config.loop && config.duration <= 0) {
         log('Lỗi: Thời lượng phải lớn hơn 0 trong Chế độ Lặp.', 'error');
@@ -101,7 +167,10 @@ btnProcess.addEventListener('click', async () => {
 
     btnProcess.disabled = true;
     btnProcess.textContent = 'Đang xử lý...';
-    log(`Bắt đầu xử lý ${runCount} lần...`, 'info');
+    
+    const modeText = isLoopMode ? 'Chế độ Lặp' : 'Chế độ Không Lặp';
+    const output2Text = enableOutput2.checked ? ' với Output 2' : '';
+    log(`Bắt đầu xử lý ${runCount} lần (${modeText}${output2Text})...`, 'info');
 
     try {
         await window.electronAPI.processAudio(config);
@@ -195,6 +264,11 @@ function getSettings() {
         input3: { path: paths.input3, count: countInput3.value },
         output: paths.output,
         loop: loopMode.checked,
+        normalMode: normalMode.checked,
+        enableOutput2: enableOutput2.checked,
+        output2Input1: { path: paths.output2Input1, count: countOutput2Input1.value },
+        output2Input2: { path: paths.output2Input2, count: countOutput2Input2.value },
+        output2Input3: { path: paths.output2Input3, count: countOutput2Input3.value },
         duration: {
             minutes: minutesInput.value,
             hours: hoursInput.value,
@@ -240,12 +314,51 @@ async function loadSettings() {
         pathOutput.title = paths.output || '';
     }
 
+    // Load Output 2 settings
+    if (settings.output2Input1) {
+        paths.output2Input1 = settings.output2Input1.path;
+        pathOutput2Input1.textContent = paths.output2Input1 || 'Chưa chọn thư mục...';
+        pathOutput2Input1.title = paths.output2Input1 || '';
+        countOutput2Input1.value = settings.output2Input1.count || 1;
+    }
+
+    if (settings.output2Input2) {
+        paths.output2Input2 = settings.output2Input2.path;
+        pathOutput2Input2.textContent = paths.output2Input2 || 'Chưa chọn thư mục...';
+        pathOutput2Input2.title = paths.output2Input2 || '';
+        countOutput2Input2.value = settings.output2Input2.count || 1;
+    }
+
+    if (settings.output2Input3) {
+        paths.output2Input3 = settings.output2Input3.path;
+        pathOutput2Input3.textContent = paths.output2Input3 || 'Chưa chọn thư mục...';
+        pathOutput2Input3.title = paths.output2Input3 || '';
+        countOutput2Input3.value = settings.output2Input3.count || 1;
+    }
+
+    // Load mode settings
     if (settings.loop !== undefined) {
         loopMode.checked = settings.loop;
+        normalMode.checked = !settings.loop;
         if (settings.loop) {
             durationSettings.classList.remove('hidden');
+            // Disable Output 2 in loop mode
+            enableOutput2.disabled = true;
+            enableOutput2.checked = false;
+            output2Group.classList.add('hidden');
         } else {
             durationSettings.classList.add('hidden');
+            enableOutput2.disabled = false;
+        }
+    }
+
+    // Load Output 2 enable setting
+    if (settings.enableOutput2 !== undefined) {
+        enableOutput2.checked = settings.enableOutput2;
+        if (settings.enableOutput2) {
+            output2Group.classList.remove('hidden');
+        } else {
+            output2Group.classList.add('hidden');
         }
     }
 
@@ -261,7 +374,9 @@ async function loadSettings() {
 // Attach Save Listeners
 const inputsToWatch = [
     countInput1, countInput2, countInput3,
-    loopMode, minutesInput, hoursInput, secondsInput, runCountInput
+    countOutput2Input1, countOutput2Input2, countOutput2Input3,
+    loopMode, normalMode, enableOutput2, 
+    minutesInput, hoursInput, secondsInput, runCountInput
 ];
 
 inputsToWatch.forEach(el => {
