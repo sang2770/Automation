@@ -209,6 +209,7 @@ ipcMain.handle("process:start", async (event, config) => {
     duration,
     runCount = 1,
     enableOutput2,
+    swapOutput2,
     output2Input1,
     output2Input2,
     output2Input3,
@@ -225,7 +226,7 @@ ipcMain.handle("process:start", async (event, config) => {
 
     if (enableOutput2) {
       // Process both Output 1 and Output 2
-      return await processDualOutput(runIndex);
+      return await processDualOutput(runIndex, swapOutput2);
     } else {
       // Original single output processing
       return await processSingleOutput(runIndex);
@@ -395,9 +396,8 @@ ipcMain.handle("process:start", async (event, config) => {
     );
   };
 
-  const processDualOutput = async (runIndex) => {
-    log(`[Run ${runIndex}] Chế độ Output 2 được bật`);
-
+  const processDualOutput = async (runIndex, swapOutput2 = false) => {
+    log(`[Run ${runIndex}] Chế độ Output 2 được bật Nối ${swapOutput2 ? "Output 1 + Output 2" : "Output 2 + Output 1"}`);
     // ==============================
     // STEP 1: Create Output 1 (normal processing)
     // ==============================
@@ -518,11 +518,18 @@ ipcMain.handle("process:start", async (event, config) => {
     // ==============================
     // STEP 4: Concatenate Output2 + Output1
     // ==============================
-
-    log(`[Run ${runIndex}] Nối Output2 + Output1...`);
+    log(!swapOutput2 ? `[Run ${runIndex}] Nối Output2 + Output1...` : `[Run ${runIndex}] Nối Output1 + Output2...`);
 
     const finalOutputName = `output_${runIndex}_${Date.now()}.mp3`;
-    const finalOutputPath = path.join(output, finalOutputName);
+    let finalOutputPath = path.join(output, finalOutputName);
+    if (swapOutput2) {
+      // check if audio_add folder exists, if not create it
+      const audioAddPath = path.join(output, 'audio_add');
+      if (!fs.existsSync(audioAddPath)) {
+        fs.mkdirSync(audioAddPath);
+      }
+      finalOutputPath = path.join(output, 'audio_add', finalOutputName);
+    }
 
     // Create concat list
     const concatListPath = path.join(
@@ -530,10 +537,16 @@ ipcMain.handle("process:start", async (event, config) => {
       `final_concat_${runIndex}_${Date.now()}.txt`,
     );
 
-    const concatContent = [
+    let concatContent = [
       `file '${output2Result.path.replace(/'/g, "'\\''")}'`,
       `file '${output1Result.path.replace(/'/g, "'\\''")}'`,
     ].join("\n");
+    if (swapOutput2) {
+      concatContent = [
+        `file '${output1Result.path.replace(/'/g, "'\\''")}'`,
+        `file '${output2Result.path.replace(/'/g, "'\\''")}'`,
+      ].join("\n");
+    }
 
     fs.writeFileSync(concatListPath, concatContent);
 
@@ -568,7 +581,10 @@ ipcMain.handle("process:start", async (event, config) => {
     // ==============================
 
     const logFileName = finalOutputName.replace(".mp3", "_log.txt");
-    const logFilePath = path.join(output, logFileName);
+    let logFilePath = path.join(output, logFileName);
+    if (swapOutput2) {
+      logFilePath = path.join(output, 'audio_add', logFileName);
+    }
 
     let logFileContent = "";
 
@@ -580,14 +596,14 @@ ipcMain.handle("process:start", async (event, config) => {
     logFileContent += `Total Duration: ${(output1Duration * 2).toFixed(3)}s\n`;
     logFileContent += `${"=".repeat(80)}\n\n`;
 
-    logFileContent += `Cấu trúc: Output 2 + Output 1\n`;
+    logFileContent += `Cấu trúc: ${swapOutput2 ? "Output 2 + Output 1" : "Output 1 + Output 2"}\n`;
     logFileContent += `- Output 2 được tạo với cùng thời lượng như Output 1\n`;
-    logFileContent += `- Kết quả cuối là nối Output 2 + Output 1\n\n`;
+    logFileContent += `- Kết quả cuối là nối ${swapOutput2 ? "Output 2 + Output 1" : "Output 1 + Output 2"}\n\n`;
 
     logFileContent += `Chi tiết xử lý:\n`;
     logFileContent += `- Output 1: Xử lý từ Input 1, 2, 3 (chế độ ${loop ? "lặp" : "không lặp"})\n`;
     logFileContent += `- Output 2: Xử lý từ Output2 Input 1, 2, 3 với thời lượng khớp Output 1\n`;
-    logFileContent += `- Ghép cuối: Output 2 + Output 1\n`;
+    logFileContent += `- Ghép cuối: ${swapOutput2 ? "Output 2 + Output 1" : "Output 1 + Output 2"}\n`;
 
     // List files for Output 1
     logFileContent += `\n${"-".repeat(80)}\n`;

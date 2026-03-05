@@ -26,6 +26,7 @@ const countOutput2Input3 = document.getElementById('count-output2-input3');
 const loopMode = document.getElementById('loop-mode');
 const normalMode = document.getElementById('normal-mode');
 const enableOutput2 = document.getElementById('enable-output2');
+const swapOutput2 = document.getElementById('swap-output2');
 const output2Group = document.getElementById('output2-group');
 const durationSettings = document.getElementById('duration-settings');
 const minutesInput = document.getElementById('minutes');
@@ -151,7 +152,8 @@ btnProcess.addEventListener('click', async () => {
         loop: isLoopMode,
         duration: (parseInt(minutesInput.value) || 0) * 60 + (parseInt(hoursInput.value) || 0) * 3600 + (parseInt(secondsInput.value) || 0),
         runCount: runCount,
-        enableOutput2: enableOutput2.checked
+        enableOutput2: enableOutput2.checked,
+        swapOutput2: swapOutput2.checked
     };
 
     if (enableOutput2.checked) {
@@ -171,7 +173,6 @@ btnProcess.addEventListener('click', async () => {
     const modeText = isLoopMode ? 'Chế độ Lặp' : 'Chế độ Không Lặp';
     const output2Text = enableOutput2.checked ? ' với Output 2' : '';
     log(`Bắt đầu xử lý ${runCount} lần (${modeText}${output2Text})...`, 'info');
-
     try {
         await window.electronAPI.processAudio(config);
     } catch (err) {
