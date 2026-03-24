@@ -287,6 +287,7 @@ function isValidEmail_(email) {
 
       // Handle 2FA if required
       if (
+        !secretKey.includes("@") &&
         await page
           .locator('input[type="tel"], input[aria-label*="code"]')
           .isVisible()
@@ -301,18 +302,47 @@ function isValidEmail_(email) {
         if (await page.locator(nextButtonSelector).isVisible()) {
           await page.click(nextButtonSelector);
         }
+      } else {
+        this.sendMessage("progress", `No 2FA required for ${email}`);
+      }
+
+      try {
+        if (
+          secretKey.includes("@") &&
+          await page.locator('text=Confirm your recovery email')
+            .isVisible()
+        ) {
+          this.sendMessage("progress", `Handling recovery email confirmation for ${email}`);
+          await page.click('text=Confirm your recovery email');
+          await this.delay(5000);
+
+          this.sendMessage("progress", `Entering recovery email for ${secretKey}`);
+          // name="knowledgePreregisteredEmailResponse"
+          await page.fill('input[name="knowledgePreregisteredEmailResponse"], input[type="email"]', secretKey);
+          await this.delay(1000);
+          await page.click('button:has-text("Next"), button[type="submit"]');
+          await this.delay(5000);
+        } else {
+          this.sendMessage("progress", `No recovery email confirmation required for ${email}`);
+        }
+      } catch (error) {
+        this.sendMessage("warn", `Error handling recovery email confirmation for ${email}: ${error.message}`);
       }
 
       // Handle "Not now" or "Skip" buttons
-      if (
-        await page
-          .locator('button:has-text("Not now"), button:has-text("Skip")')
-          .isVisible()
-      ) {
-        await page
-          .locator('button:has-text("Not now"), button:has-text("Skip")')
-          .click();
-        await this.delay(2000);
+      try {
+        if (
+          await page
+            .locator('button:has-text("Not now"), button:has-text("Skip")')
+            .isVisible()
+        ) {
+          await page
+            .locator('button:has-text("Not now"), button:has-text("Skip")')
+            .click();
+          await this.delay(2000);
+        }
+      } catch (error) {
+        // Ignore if not found
       }
 
       this.sendMessage("progress", `Creating new Google Sheet for ${email}`);
@@ -390,6 +420,8 @@ function isValidEmail_(email) {
       );
       await this.executeFunction(newPage, fillDataFunc);
       this.sendMessage("progress", `Fill data function executed for ${email}`);
+
+      await this.handlePermissionAuthorization(browser, newPage, secretKey);
       await this.delay(5000);
 
       // Execute send emails function
@@ -398,6 +430,8 @@ function isValidEmail_(email) {
         "progress",
         `Send emails function executed for ${email}`,
       );
+
+      await this.handlePermissionAuthorization(browser, newPage, secretKey);
 
       // Monitor execution and re-run if needed
       await this.monitorExecution(newPage);
