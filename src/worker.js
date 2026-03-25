@@ -20,6 +20,79 @@ class WorkerProcess {
     return new Promise((res) => setTimeout(res, ms));
   }
 
+  // Build a realistic desktop fingerprint profile to reduce automation signals
+  getStealthProfile() {
+    const userAgents = [
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+    ];
+
+    const viewportPresets = [
+      { width: 1366, height: 768 },
+      { width: 1440, height: 900 },
+      { width: 1536, height: 864 },
+      { width: 1920, height: 1080 },
+    ];
+
+    return {
+      userAgent: userAgents[Math.floor(Math.random() * userAgents.length)],
+      viewport: viewportPresets[Math.floor(Math.random() * viewportPresets.length)],
+      locale: "en-US",
+      timezoneId: "America/New_York",
+      colorScheme: "light",
+      platform: "Win32",
+      languages: ["en-US", "en"],
+    };
+  }
+
+  async applyContextStealth(context, profile) {
+    await context.setExtraHTTPHeaders({
+      "Accept-Language": "en-US,en;q=0.9",
+      "Upgrade-Insecure-Requests": "1",
+      DNT: "1",
+    });
+
+    await context.addInitScript((stealthProfile) => {
+      Object.defineProperty(navigator, "webdriver", {
+        get: () => undefined,
+      });
+
+      Object.defineProperty(navigator, "platform", {
+        get: () => stealthProfile.platform,
+      });
+
+      Object.defineProperty(navigator, "language", {
+        get: () => stealthProfile.languages[0],
+      });
+
+      Object.defineProperty(navigator, "languages", {
+        get: () => stealthProfile.languages,
+      });
+
+      if (!window.chrome) {
+        window.chrome = { runtime: {} };
+      } else if (!window.chrome.runtime) {
+        window.chrome.runtime = {};
+      }
+
+      Object.defineProperty(navigator, "plugins", {
+        get: () => [
+          { name: "Chrome PDF Plugin" },
+          { name: "Chrome PDF Viewer" },
+          { name: "Native Client" },
+        ],
+      });
+
+      const originalQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = (parameters) => (
+        parameters && parameters.name === "notifications"
+          ? Promise.resolve({ state: Notification.permission })
+          : originalQuery(parameters)
+      );
+    }, profile);
+  }
+
   // Send message to main process
   sendMessage(type, message, data = null, progress = null, accountData = null) {
     process.send({
@@ -241,6 +314,7 @@ function isValidEmail_(email) {
       const exeDir = path.dirname(process.execPath);
       const safeEmail = email.replace(/[^a-zA-Z0-9]/g, "_");
       userDataDir = path.join(exeDir, `worker-${safeEmail}_${Date.now()}`);
+      const stealthProfile = this.getStealthProfile();
       // const userDataDir = path.join(
       //   __dirname,
       //   "..",
@@ -251,14 +325,29 @@ function isValidEmail_(email) {
       // Launch browser with persistent context
       browser = await chromium.launchPersistentContext(userDataDir, {
         headless: false, // Set to true for headless mode in production
+        ignoreDefaultArgs: ["--enable-automation"],
+        locale: stealthProfile.locale,
+        timezoneId: stealthProfile.timezoneId,
+        userAgent: stealthProfile.userAgent,
+        viewport: stealthProfile.viewport,
+        colorScheme: stealthProfile.colorScheme,
         args: [
           "--disable-blink-features=AutomationControlled",
           "--disable-infobars",
+          "--disable-dev-shm-usage",
+          "--disable-features=IsolateOrigins,site-per-process",
+          "--no-first-run",
+          "--no-default-browser-check",
+          "--password-store=basic",
+          "--start-maximized",
+          "--lang=en-US,en",
         ],
         executablePath:
           "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
         // "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
       });
+
+      // await this.applyContextStealth(browser, stealthProfile);
 
       const page = await browser.newPage();
 
