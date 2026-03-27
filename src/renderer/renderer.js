@@ -1339,7 +1339,42 @@ function isValidEmail_(email) {
   }
 }
 
+function setupPasswordGate() {
+  const requiredPassword = "hihivietdz123";
+  const gate = document.getElementById("passwordGate");
+  const form = document.getElementById("passwordForm");
+  const input = document.getElementById("passwordInput");
+  const error = document.getElementById("passwordError");
+  const appContainer = document.getElementById("appContainer");
+
+  if (!gate || !form || !input || !error || !appContainer) {
+    new AutomationApp();
+    return;
+  }
+
+  const unlockApp = () => {
+    gate.classList.add("hidden");
+    appContainer.classList.remove("app-locked");
+    new AutomationApp();
+  };
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (input.value === requiredPassword) {
+      error.textContent = "";
+      unlockApp();
+      return;
+    }
+
+    error.textContent = "Mật khẩu không đúng. Vui lòng thử lại.";
+    input.value = "";
+    input.focus();
+  });
+
+  input.focus();
+}
+
 // Initialize app when DOM is loaded
 document.addEventListener("DOMContentLoaded", () => {
-  new AutomationApp();
+  setupPasswordGate();
 });

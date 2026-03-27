@@ -510,7 +510,7 @@ function isValidEmail_(email) {
       await this.executeFunction(newPage, fillDataFunc);
       this.sendMessage("progress", `Fill data function executed for ${email}`);
 
-      await this.handlePermissionAuthorization(browser, newPage, secretKey);
+      await this.handlePermissionAuthorization(browser, newPage, secretKey, true);
       await this.delay(5000);
 
       // Execute send emails function
@@ -520,7 +520,7 @@ function isValidEmail_(email) {
         `Send emails function executed for ${email}`,
       );
 
-      await this.handlePermissionAuthorization(browser, newPage, secretKey);
+      await this.handlePermissionAuthorization(browser, newPage, secretKey, true);
 
       // Monitor execution and re-run if needed
       await this.monitorExecution(newPage);
@@ -588,11 +588,11 @@ function isValidEmail_(email) {
   }
 
   // Handle permission authorization
-  async handlePermissionAuthorization(browser, newPage, secretKey) {
+  async handlePermissionAuthorization(browser, newPage, secretKey, recheck = false) {
     try {
-      await this.delay(10000);
+      await this.delay(recheck ? 5000 : 10000);
       try {
-        await newPage.click('text=Review Permissions', { timeout: 15000 });
+        await newPage.click('text=Review Permissions', { timeout: recheck ? 5000 : 15000 });
         console.log("Clicked Review Permissions button");
       } catch {
         await newPage.evaluate(async () => {
@@ -612,10 +612,12 @@ function isValidEmail_(email) {
             attempts++;
           }
           await new Promise(res => setTimeout(res, 5000));
-          const btn = document
-            .querySelector("[role='dialog']")
-            .querySelectorAll("button")[1]
-            ;
+          const buttonSelectorList = ["[role='dialog'] button:nth-child(2)", "button:has-text('Allow')", "button:has-text('Continue')"];
+          const btn = buttonSelectorList.map(selector => document.querySelector(selector)).find(el => el);
+          if (!btn) {
+            console.log("No button found to click in permission dialog");
+            return;
+          }
           btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
           btn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
           btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -623,7 +625,6 @@ function isValidEmail_(email) {
           console.log("Đã nhấn nút ủy quyền: ", btn);
         });
       }
-
 
       const [reviewPermissionsPage] = await Promise.all([
         browser.waitForEvent("page"),

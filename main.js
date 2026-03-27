@@ -229,14 +229,14 @@ function isValidEmail_(email) {
     await page.goto("https://myaccount.google.com/", {
       waitUntil: "domcontentloaded",
     });
-    await page.goto(
-      "https://docs.google.com/spreadsheets/d/1mVQ44j5Q0ecnrXIglQ4QxtV3eJHSZQpRFSRQI1VgvTo/edit?gid=0#gid=0",
-    );
+    // await page.goto(
+    //   "https://docs.google.com/spreadsheets/d/1mVQ44j5Q0ecnrXIglQ4QxtV3eJHSZQpRFSRQI1VgvTo/edit?gid=0#gid=0",
+    // );
 
     // // Go to Google login
-    // await page.goto("https://accounts.google.com/signin", {
-    //   waitUntil: "domcontentloaded",
-    // });
+    await page.goto("https://accounts.google.com/signin", {
+      waitUntil: "domcontentloaded",
+    });
     // console.log("📧 Entering email...");
     // await page.fill('input[type="email"]', email);
     // await delay(1000);

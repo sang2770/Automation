@@ -12,6 +12,64 @@ body {
     overflow-x: hidden;
 }
 
+.app-locked {
+    filter: blur(3px);
+    pointer-events: none;
+    user-select: none;
+}
+
+.password-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 20px;
+}
+
+.password-gate.hidden {
+    display: none;
+}
+
+.password-card {
+    width: 100%;
+    max-width: 420px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+}
+
+.password-card h2 {
+    color: #2d3748;
+    margin-bottom: 10px;
+}
+
+.password-card p {
+    color: #4a5568;
+    margin-bottom: 14px;
+}
+
+.password-form {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.password-form .btn {
+    margin: 0;
+}
+
+.password-error {
+    min-height: 18px;
+    color: #e53e3e;
+    font-weight: 600;
+    margin-top: 10px;
+    margin-bottom: 0;
+}
+
 .container {
     max-width: 1400px;
     margin: 0 auto;

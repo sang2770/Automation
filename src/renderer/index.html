@@ -8,7 +8,25 @@
   </head>
 
   <body>
-    <div class="container">
+    <div id="passwordGate" class="password-gate">
+      <div class="password-card">
+        <h2>🔐 Xác thực sử dụng</h2>
+        <p>Nhập mật khẩu để kích hoạt công cụ.</p>
+        <form id="passwordForm" class="password-form">
+          <input
+            id="passwordInput"
+            type="password"
+            placeholder="Nhập mật khẩu"
+            autocomplete="off"
+            required
+          />
+          <button type="submit" class="btn btn-primary">Kích hoạt</button>
+        </form>
+        <p id="passwordError" class="password-error"></p>
+      </div>
+    </div>
+
+    <div id="appContainer" class="container app-locked">
       <header>
         <h1>🚀 Công cụ Tự động hóa</h1>
         <p>Tự động hóa Playwright đa luồng với Workers</p>
