@@ -294,6 +294,8 @@ class ElectronApp {
       });
 
       this.workers.set(workerId, worker);
+      let isSettled = false;
+      let completedPayload = null;
 
       // Lắng nghe tin nhắn từ worker
       worker.on("message", (message) => {
@@ -305,14 +307,14 @@ class ElectronApp {
           });
         }
 
-        // Xử lý khi worker hoàn thành
-        if (message.type === "completed" || message.type === "error") {
-          this.workers.delete(workerId);
-
-          if (message.type === "completed") {
-            resolve(message.data);
-          } else {
-            reject(new Error(message.error));
+        // Worker chỉ được xem là hoàn thành khi gửi completed.
+        // Message error có thể chỉ là lỗi của 1 account, worker vẫn chạy tiếp.
+        if (message.type === "completed") {
+          completedPayload = message.data;
+          if (!isSettled) {
+            isSettled = true;
+            this.workers.delete(workerId);
+            resolve(completedPayload);
           }
         }
       });
@@ -320,15 +322,26 @@ class ElectronApp {
       // Xử lý lỗi worker
       worker.on("error", (error) => {
         console.error(`Worker ${workerId} error:`, error);
-        this.workers.delete(workerId);
-        reject(error);
+        if (!isSettled) {
+          isSettled = true;
+          this.workers.delete(workerId);
+          reject(error);
+        }
       });
 
       // Xử lý khi worker bị đóng
       worker.on("exit", (code) => {
         console.log(`Worker ${workerId} exited with code ${code}`);
         this.workers.delete(workerId);
-        if (code !== 0) {
+        if (isSettled) {
+          return;
+        }
+
+        if (code === 0) {
+          isSettled = true;
+          resolve(completedPayload || { results: [], successCount: 0, errorCount: 0 });
+        } else {
+          isSettled = true;
           reject(new Error(`Worker exited with code ${code}`));
         }
       });

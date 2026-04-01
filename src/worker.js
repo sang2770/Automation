@@ -8,6 +8,7 @@ class WorkerProcess {
     this.browser = null;
     this.config = null;
     this.isRunning = false;
+    this.reusableDataPool = [];
   }
 
   // Generate 2FA code
@@ -103,6 +104,37 @@ class WorkerProcess {
       accountData,
       timestamp: new Date().toISOString(),
     });
+  }
+
+  isManualCloseError(error) {
+    const msg = (error && error.message ? error.message : String(error || ""))
+      .toLowerCase();
+
+    return (
+      msg.includes("target page, context or browser has been closed") ||
+      msg.includes("target closed") ||
+      msg.includes("context closed") ||
+      msg.includes("browser has been closed") ||
+      msg.includes("page has been closed")
+    );
+  }
+
+  getAccountReusableData(account) {
+    if (!account) {
+      return null;
+    }
+
+    const candidate = account.distributedData || account.data;
+    if (!candidate) {
+      return null;
+    }
+
+    return {
+      A: Array.isArray(candidate.A) ? [...candidate.A] : [],
+      B: Array.isArray(candidate.B) ? [...candidate.B] : [],
+      C: Array.isArray(candidate.C) ? [...candidate.C] : [],
+      D: Array.isArray(candidate.D) ? [...candidate.D] : [],
+    };
   }
 
   // Generate default fillDataFuncString with account-specific or global data
@@ -523,20 +555,49 @@ function isValidEmail_(email) {
       await this.handlePermissionAuthorization(browser, newPage, secretKey, true);
 
       // Monitor execution and re-run if needed
-      await this.monitorExecution(newPage);
+      const monitorResult = await this.monitorExecution(newPage);
+      if (monitorResult && monitorResult.interrupted) {
+        const interruptionError = new Error(
+          monitorResult.message || "Execution interrupted by manual tab close",
+        );
+        interruptionError.manualClose = true;
+        throw interruptionError;
+      }
 
       this.sendMessage("success", `Account ${email} processed successfully`, null, null, { email: email, password: account.password });
 
       return { success: true, account: email };
     } catch (error) {
+      const manualClose = this.isManualCloseError(error) || !!error.manualClose;
+      const reusableData = manualClose ? this.getAccountReusableData(account) : null;
+
       this.sendMessage(
         "error",
         `Error processing account ${email}: ${error.message}`,
-        null,
+        {
+          manualClose,
+          reusableData,
+        },
         null,
         { email: email, password: account.password }
       );
-      return { success: false, account: email, error: error.message };
+
+      if (manualClose && reusableData) {
+        this.reusableDataPool.push(reusableData);
+        this.sendMessage(
+          "info",
+          `Manual tab close detected for ${email}. Data returned to pool (${this.reusableDataPool.length} available).`,
+          { poolSize: this.reusableDataPool.length },
+        );
+      }
+
+      return {
+        success: false,
+        account: email,
+        error: error.message,
+        manualClose,
+        reusableData,
+      };
     } finally {
       // Close browser if it was initialized
       if (browser) {
@@ -703,75 +764,90 @@ function isValidEmail_(email) {
       const maxAttempts = 100;
 
       const checkExecution = async () => {
-        if (attempts >= maxAttempts) {
-          resolve();
-          return;
-        }
-
-        const result = await newPage.evaluate(() => {
-          const itemList = document.querySelectorAll('[role="listitem"]');
-          if (itemList.length > 0) {
-            const lastItem = itemList[itemList.length - 1];
-            const texts = lastItem.querySelectorAll("div");
-
-            const errorDiv = Array.from(texts).find((div) =>
-              div.textContent.includes("Exceeded maximum execution time"),
-            );
-
-            if (errorDiv) {
-              return { timeout: true };
-            }
-
-            const success = Array.from(texts).find((div) =>
-              div.textContent.includes("Execution completed"),
-            );
-
-            if (success) {
-              return { success: true };
-            }
-
-            // An unknown error has occurred, please try again later
-            const unknownErrorDiv = Array.from(texts).find((div) =>
-              div.textContent.includes(
-                "An unknown error has occurred, please try again later",
-              ),
-            );
-
-            if (unknownErrorDiv) {
-              return { error: true };
-            }
+        try {
+          if (attempts >= maxAttempts) {
+            resolve({ interrupted: false });
+            return;
           }
 
-          return {};
-        });
+          const result = await newPage.evaluate(() => {
+            const itemList = document.querySelectorAll('[role="listitem"]');
+            if (itemList.length > 0) {
+              const lastItem = itemList[itemList.length - 1];
+              const texts = lastItem.querySelectorAll("div");
 
-        if (result.timeout) {
-          this.sendMessage(
-            "progress",
-            `Execution timeout detected, re-running script (attempt ${attempts + 1})`,
-          );
-          await this.reRunScript(newPage);
-          attempts++;
-          setTimeout(checkExecution, 5000);
-        } else if (result.success) {
-          this.sendMessage(
-            "progress",
-            `Script execution completed successfully`,
-          );
-          resolve();
-        } else if (result.error) {
-          // Unknown error or still running
+              const errorDiv = Array.from(texts).find((div) =>
+                div.textContent.includes("Exceeded maximum execution time"),
+              );
 
-          // reload and re-run
-          await this.reRunScript(newPage);
-          attempts++;
-          setTimeout(checkExecution, 5000);
-        } else {
+              if (errorDiv) {
+                return { timeout: true };
+              }
+
+              const success = Array.from(texts).find((div) =>
+                div.textContent.includes("Execution completed"),
+              );
+
+              if (success) {
+                return { success: true };
+              }
+
+              // An unknown error has occurred, please try again later
+              const unknownErrorDiv = Array.from(texts).find((div) =>
+                div.textContent.includes(
+                  "An unknown error has occurred, please try again later",
+                ),
+              );
+
+              if (unknownErrorDiv) {
+                return { error: true };
+              }
+            }
+
+            return {};
+          });
+
+          if (result.timeout) {
+            this.sendMessage(
+              "progress",
+              `Execution timeout detected, re-running script (attempt ${attempts + 1})`,
+            );
+            await this.reRunScript(newPage);
+            attempts++;
+            setTimeout(checkExecution, 5000);
+          } else if (result.success) {
+            this.sendMessage(
+              "progress",
+              "Script execution completed successfully",
+            );
+            resolve({ interrupted: false });
+          } else if (result.error) {
+            // Unknown error or still running
+            await this.reRunScript(newPage);
+            attempts++;
+            setTimeout(checkExecution, 5000);
+          } else {
+            this.sendMessage(
+              "progress",
+              `Waiting for script execution to complete (attempt ${attempts + 1})`,
+            );
+            setTimeout(checkExecution, 5000);
+          }
+        } catch (error) {
+          if (this.isManualCloseError(error)) {
+            resolve({
+              interrupted: true,
+              message: "Tab/browser was closed manually during script execution",
+            });
+            return;
+          }
+
           this.sendMessage(
-            "progress",
-            `Waiting for script execution to complete (attempt ${attempts + 1})`,
+            "warn",
+            `Monitor execution error: ${error.message}`,
           );
-          setTimeout(checkExecution, 5000);
+          attempts++;
+          setTimeout(checkExecution, 3000);
         }
       };
 
@@ -795,6 +871,7 @@ function isValidEmail_(email) {
   async start(config) {
     this.config = config;
     this.isRunning = true;
+    this.reusableDataPool = [];
 
     this.sendMessage(
       "progress",
@@ -809,7 +886,17 @@ function isValidEmail_(email) {
         break;
       }
 
-      const account = config.accounts[i];
+      const account = { ...config.accounts[i] };
+
+      if (this.reusableDataPool.length > 0) {
+        account.distributedData = this.reusableDataPool.shift();
+        this.sendMessage(
+          "info",
+          `Assigned recycled data to next worker slot (remaining pool: ${this.reusableDataPool.length})`,
+          { poolSize: this.reusableDataPool.length },
+        );
+      }
+
       const result = await this.processAccount(
         account,
         i,
