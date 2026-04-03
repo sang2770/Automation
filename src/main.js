@@ -204,15 +204,11 @@ ipcMain.handle("process:start", async (event, config) => {
     input1,
     input2,
     input3,
+    group2input1,
+    group2input2,
+    group2input3,
     output,
-    loop,
-    duration,
     runCount = 1,
-    enableOutput2,
-    swapOutput2,
-    output2Input1,
-    output2Input2,
-    output2Input3,
   } = config;
 
   const sender = event.sender;
@@ -223,14 +219,9 @@ ipcMain.handle("process:start", async (event, config) => {
 
   const processSingleRun = async (runIndex) => {
     log(`\n=== Bắt đầu lần chạy ${runIndex}/${runCount} ===`);
-
-    if (enableOutput2) {
-      // Process both Output 1 and Output 2
-      return await processDualOutput(runIndex, swapOutput2);
-    } else {
-      // Original single output processing
-      return await processSingleOutput(runIndex);
-    }
+    const g1Result = await processSingleOutput(runIndex);
+    log(`[Run ${runIndex}] Bắt đầu tạo Output 2 (Group 2)...`);
+    await processGroup2Output(runIndex, g1Result.originalFiles);
   };
 
   const processSingleOutput = async (runIndex) => {
@@ -257,20 +248,8 @@ ipcMain.handle("process:start", async (event, config) => {
       duration3 += await getDuration(wavFile);
     }
 
-    if (loop && duration3 > duration) {
-      throw new Error(
-        `Input3 (${duration3.toFixed(
-          3,
-        )}s) dài hơn duration yêu cầu (${duration}s). Không được cắt Input3.`,
-      );
-    }
-
-    const targetMainDuration = loop ? duration - duration3 : 0;
-
     log(
-      `[Run ${runIndex}] Input3: ${duration3.toFixed(
-        3,
-      )}s | Cần từ Input1+2: ${loop ? targetMainDuration.toFixed(3) : "không giới hạn"}s`,
+      `[Run ${runIndex}] Input3: ${duration3.toFixed(3)}s`,
     );
 
     // ==============================
@@ -280,56 +259,7 @@ ipcMain.handle("process:start", async (event, config) => {
     let mainList = [];
     let currentDuration = 0;
 
-    if (loop) {
-      let safety = 0;
-
-      while (currentDuration < targetMainDuration) {
-        safety++;
-        if (safety > 1000)
-          throw new Error("Safety limit reached (1000 iterations)");
-
-        const files1 = getRandomFiles(input1.path, input1.count);
-        const files2 = getRandomFiles(input2.path, input2.count);
-
-        if (files1.length === 0 && files2.length === 0)
-          throw new Error("Không tìm thấy file trong Input1 hoặc Input2.");
-
-        for (const file of [...files1, ...files2]) {
-          // Convert to WAV first
-          const wavFile = await convertToWav(file);
-          wavFilesList.push(wavFile);
-
-          const fileDuration = await getDuration(wavFile);
-
-          if (currentDuration + fileDuration <= targetMainDuration) {
-            mainList.push(wavFile);
-            originalFilesList.push(file); // Track original MP3
-            currentDuration += fileDuration;
-          } else {
-            const remain = targetMainDuration - currentDuration;
-
-            if (remain > 0.001) {
-              // More precise threshold for WAV
-              const trimmedWav = await trimWavFile(wavFile, remain);
-              wavFilesList.push(trimmedWav);
-
-              mainList.push(trimmedWav);
-              originalFilesList.push(file + ` (cắt ${remain.toFixed(3)}s)`); // Track with trim info
-              currentDuration += remain;
-
-              log(
-                `[Run ${runIndex}] Cắt file ${path.basename(
-                  file,
-                )} lấy ${remain.toFixed(3)}s`,
-              );
-            }
-
-            break;
-          }
-        }
-      }
-    } else {
-      // KHÔNG LOOP — chỉ lấy 1 lượt
+    // KHÔNG LOOP — chỉ lấy 1 lượt
       const files1 = getRandomFiles(input1.path, input1.count);
       const files2 = getRandomFiles(input2.path, input2.count);
 
@@ -345,7 +275,6 @@ ipcMain.handle("process:start", async (event, config) => {
         originalFilesList.push(file); // Track original MP3
         currentDuration += await getDuration(wavFile);
       }
-    }
 
     // ==============================
     // 3️⃣ GHÉP ENDING
@@ -355,34 +284,12 @@ ipcMain.handle("process:start", async (event, config) => {
     finalList.push(...wavFiles3);
 
     // ==============================
-    // 4️⃣ VERIFY FINAL DURATION (only for loop mode)
+    // 4️⃣ VERIFY FINAL DURATION
     // ==============================
 
     let verify = 0;
     for (const f of finalList) {
       verify += await getDuration(f);
-    }
-
-    if (loop) {
-      const diff = Math.abs(verify - duration);
-
-      if (diff > 0.001) {
-        // More strict tolerance for WAV
-        // Trim last file if possible
-        const lastFile = finalList[finalList.length - 1];
-        const lastDuration = await getDuration(lastFile);
-
-        if (lastDuration > diff) {
-          const trimmedFile = await trimWavFile(lastFile, lastDuration - diff);
-          finalList[finalList.length - 1] = trimmedFile;
-        } else {
-          log(
-            `[Run ${runIndex}] Cảnh báo: Không thể cắt file cuối để đạt đúng duration. Sai số: ${diff.toFixed(
-              3,
-            )}s`,
-          );
-        }
-      }
     }
 
     log(`[Run ${runIndex}] Duration cuối cùng: ${verify.toFixed(3)}s`);
@@ -393,241 +300,47 @@ ipcMain.handle("process:start", async (event, config) => {
       originalFilesList,
       wavFilesList,
       verify,
+      'G1',
     );
   };
 
-  const processDualOutput = async (runIndex, swapOutput2 = false) => {
-    log(`[Run ${runIndex}] Chế độ Output 2 được bật Nối ${swapOutput2 ? "Output 1 + Output 2" : "Output 2 + Output 1"}`);
-    // ==============================
-    // STEP 1: Create Output 1 (normal processing)
-    // ==============================
+  const processGroup2Output = async (runIndex, group1Files) => {
+    const wavFilesList = [];
+    const originalFilesList2 = [];
+    const finalList = [];
 
-    log(`[Run ${runIndex}] Tạo Output 1...`);
-    const output1Result = await processSingleOutput(runIndex);
-    const output1Duration = output1Result.duration;
+    log(`[Run ${runIndex}] Tạo Output 2 từ danh sách bài của Output 1...`);
 
-    log(
-      `[Run ${runIndex}] Output 1 hoàn thành với thời lượng: ${output1Duration.toFixed(3)}s`,
-    );
+    for (const origFile of group1Files) {
+      const fileName = path.basename(origFile);
+      const normalizedOrig = path.normalize(origFile);
 
-    // ==============================
-    // STEP 2: Create Output 2 with same duration as Output 1
-    // ==============================
+      let g2Dir = null;
+      if (normalizedOrig.startsWith(path.normalize(input1.path) + path.sep))
+        g2Dir = group2input1.path;
+      else if (normalizedOrig.startsWith(path.normalize(input2.path) + path.sep))
+        g2Dir = group2input2.path;
+      else if (normalizedOrig.startsWith(path.normalize(input3.path) + path.sep))
+        g2Dir = group2input3.path;
 
-    log(
-      `[Run ${runIndex}] Tạo Output 2 với thời lượng ${output1Duration.toFixed(3)}s...`,
-    );
+      if (!g2Dir)
+        throw new Error(`Không thể xác định thư mục Group 2 cho file: ${fileName}`);
 
-    const finalList2 = [];
-    const originalFilesList2 = []; // Track original MP3 file paths for Output 2
-    const wavFilesList2 = [];
+      const g2FilePath = path.join(g2Dir, fileName);
+      if (!fs.existsSync(g2FilePath))
+        throw new Error(`Group 2 thiếu file: "${fileName}" trong "${g2Dir}"`);
 
-    // Get Output 2 ending files
-    const files2_3 = getRandomFiles(output2Input3.path, output2Input3.count);
-    if (files2_3.length === 0)
-      throw new Error("Không tìm thấy file trong Output2 Input 3.");
-
-    const wavFiles2_3 = [];
-    let duration2_3 = 0;
-
-    for (const f of files2_3) {
-      const wavFile = await convertToWav(f);
-      wavFilesList2.push(wavFile);
-      wavFiles2_3.push(wavFile);
-      originalFilesList2.push(f); // Track original MP3
-      duration2_3 += await getDuration(wavFile);
+      const wavFile = await convertToWav(g2FilePath);
+      wavFilesList.push(wavFile);
+      finalList.push(wavFile);
+      originalFilesList2.push(g2FilePath);
     }
 
-    const targetMainDuration2 = output1Duration - duration2_3;
+    let verify = 0;
+    for (const f of finalList) verify += await getDuration(f);
+    log(`[Run ${runIndex}] Group 2 Duration: ${verify.toFixed(3)}s`);
 
-    if (targetMainDuration2 < 0) {
-      log(
-        `[Run ${runIndex}] Cảnh báo: Output2 Input3 dài hơn Output1. Sẽ cắt Output2 Input3.`,
-        "warning",
-      );
-      // Trim the ending files to fit
-      const trimmedFile = await trimWavFile(wavFiles2_3[0], output1Duration);
-      wavFilesList2.push(trimmedFile);
-      finalList2.push(trimmedFile);
-      // Update original files list to reflect the trimming - only keep the first file that was trimmed
-      originalFilesList2[0] =
-        originalFilesList2[0] + ` (cắt để khớp ${output1Duration.toFixed(3)}s)`;
-    } else {
-      // Build main list for Output 2
-      let mainList2 = [];
-      let currentDuration2 = 0;
-      let safety = 0;
-
-      while (currentDuration2 < targetMainDuration2) {
-        safety++;
-        if (safety > 1000)
-          throw new Error("Safety limit reached (1000 iterations) for Output2");
-
-        const files2_1 = getRandomFiles(
-          output2Input1.path,
-          output2Input1.count,
-        );
-        const files2_2 = getRandomFiles(
-          output2Input2.path,
-          output2Input2.count,
-        );
-
-        if (files2_1.length === 0 && files2_2.length === 0)
-          throw new Error(
-            "Không tìm thấy file trong Output2 Input1 hoặc Input2.",
-          );
-        for (const file of [...files2_1, ...files2_2]) {
-          mainList2.push(file);
-          currentDuration2 += await getDuration(file);
-          originalFilesList2.push(file); // Track original MP3 for Output 2
-          if (currentDuration2 >= targetMainDuration2) break;
-        }
-      }
-      const mainList2Wav = [];
-      await Promise.all(
-        mainList2.map(async (file) => {
-          mainList2Wav.push(await convertToWav(file));
-        }),
-      );
-      if (currentDuration2 > targetMainDuration2) {
-        const lastFile = mainList2Wav[mainList2Wav.length - 1];
-        const lastDuration = await getDuration(lastFile);
-        const excess = currentDuration2 - targetMainDuration2;
-        const trimmedFile = await trimWavFile(lastFile, lastDuration - excess);
-        mainList2Wav[mainList2Wav.length - 1] = trimmedFile;
-        log(
-          `[Run ${runIndex}] Cắt file cuối của Output 2 để khớp thời lượng với Output 1, cắt ${excess.toFixed(3)}s`,
-        );
-      }
-      finalList2.push(...mainList2Wav);
-      finalList2.push(...wavFiles2_3);
-    }
-
-    // ==============================
-    // STEP 3: Merge Output 2
-    // ==============================
-
-    const output2Result = await finalizeOutput(
-      `${runIndex}_output2`,
-      finalList2,
-      originalFilesList2,
-      wavFilesList2,
-      output1Duration,
-    );
-
-    // ==============================
-    // STEP 4: Concatenate Output2 + Output1
-    // ==============================
-    log(!swapOutput2 ? `[Run ${runIndex}] Nối Output2 + Output1...` : `[Run ${runIndex}] Nối Output1 + Output2...`);
-
-    const finalOutputName = `output_${runIndex}_${Date.now()}.mp3`;
-    let finalOutputPath = path.join(output, finalOutputName);
-    if (swapOutput2) {
-      // check if audio_add folder exists, if not create it
-      const audioAddPath = path.join(output, 'audio_add');
-      if (!fs.existsSync(audioAddPath)) {
-        fs.mkdirSync(audioAddPath);
-      }
-      finalOutputPath = path.join(output, 'audio_add', finalOutputName);
-    }
-
-    // Create concat list
-    const concatListPath = path.join(
-      app.getPath("temp"),
-      `final_concat_${runIndex}_${Date.now()}.txt`,
-    );
-
-    let concatContent = [
-      `file '${output2Result.path.replace(/'/g, "'\\''")}'`,
-      `file '${output1Result.path.replace(/'/g, "'\\''")}'`,
-    ].join("\n");
-    if (swapOutput2) {
-      concatContent = [
-        `file '${output1Result.path.replace(/'/g, "'\\''")}'`,
-        `file '${output2Result.path.replace(/'/g, "'\\''")}'`,
-      ].join("\n");
-    }
-
-    fs.writeFileSync(concatListPath, concatContent);
-
-    await new Promise((resolve, reject) => {
-      ffmpeg()
-        .input(concatListPath)
-        .inputOptions(["-f", "concat", "-safe", "0"])
-        .audioCodec("libmp3lame")
-        .audioBitrate("320k")
-        .format("mp3")
-        .on("progress", (p) => {
-          if (p.percent)
-            log(`[Run ${runIndex}] Nối cuối cùng: ${Math.floor(p.percent)}%`);
-        })
-        .on("error", reject)
-        .on("end", resolve)
-        .save(finalOutputPath);
-    });
-
-    // Clean up temp files
-    fs.unlinkSync(concatListPath);
-    fs.unlinkSync(output1Result.path);
-    fs.unlinkSync(output2Result.path);
-    if (output1Result.logFilePath) fs.unlinkSync(output1Result.logFilePath);
-    if (output2Result.logFilePath) fs.unlinkSync(output2Result.logFilePath);
-
-    // Additional cleanup for any remaining WAV files
-    log(`[Run ${runIndex}] Dọn dẹp các file tạm thời...`);
-
-    // ==============================
-    // STEP 5: Create final log file for dual output
-    // ==============================
-
-    const logFileName = finalOutputName.replace(".mp3", "_log.txt");
-    let logFilePath = path.join(output, logFileName);
-    if (swapOutput2) {
-      logFilePath = path.join(output, 'audio_add', logFileName);
-    }
-
-    let logFileContent = "";
-
-    // Header
-    logFileContent += `Run: ${runIndex}/${runCount} (Dual Output Mode)\n`;
-    logFileContent += `Output file: ${finalOutputName}\n`;
-    logFileContent += `Output 1 Duration: ${output1Duration.toFixed(3)}s\n`;
-    logFileContent += `Output 2 Duration: ${output1Duration.toFixed(3)}s\n`;
-    logFileContent += `Total Duration: ${(output1Duration * 2).toFixed(3)}s\n`;
-    logFileContent += `${"=".repeat(80)}\n\n`;
-
-    logFileContent += `Cấu trúc: ${swapOutput2 ? "Output 2 + Output 1" : "Output 1 + Output 2"}\n`;
-    logFileContent += `- Output 2 được tạo với cùng thời lượng như Output 1\n`;
-    logFileContent += `- Kết quả cuối là nối ${swapOutput2 ? "Output 2 + Output 1" : "Output 1 + Output 2"}\n\n`;
-
-    logFileContent += `Chi tiết xử lý:\n`;
-    logFileContent += `- Output 1: Xử lý từ Input 1, 2, 3 (chế độ ${loop ? "lặp" : "không lặp"})\n`;
-    logFileContent += `- Output 2: Xử lý từ Output2 Input 1, 2, 3 với thời lượng khớp Output 1\n`;
-    logFileContent += `- Ghép cuối: ${swapOutput2 ? "Output 2 + Output 1" : "Output 1 + Output 2"}\n`;
-
-    // List files for Output 1
-    logFileContent += `\n${"-".repeat(80)}\n`;
-    logFileContent += `Danh sách file Output 1 (theo thứ tự):\n`;
-    logFileContent += `${"-".repeat(80)}\n\n`;
-    output1Result.originalFiles.forEach((file, index) => {
-      const fileName = path.basename(file);
-      const fileDir = path.dirname(file);
-      const sourceFolderName = path.basename(fileDir);
-      logFileContent += `${index + 1}. ${fileName}\n`;
-      logFileContent += `   Thư mục: ${sourceFolderName}\n`;
-      logFileContent += `   Đường dẫn: ${file}\n\n`;
-    });
-
-    fs.writeFileSync(logFilePath, logFileContent, "utf-8");
-    log(`[Run ${runIndex}] Đã tạo file log: ${logFileName}`);
-
-    const totalDuration = output1Duration * 2;
-    log(
-      `✓ Hoàn thành Run ${runIndex}: ${finalOutputName} (${totalDuration.toFixed(3)}s)`,
-      "success",
-    );
-
-    return finalOutputName;
+    return await finalizeOutput(runIndex, finalList, originalFilesList2, wavFilesList, verify, 'G2');
   };
 
   const finalizeOutput = async (
@@ -636,6 +349,7 @@ ipcMain.handle("process:start", async (event, config) => {
     originalFilesList,
     wavFilesList,
     verify,
+    label = 'G1',
   ) => {
     // ==============================
     // 5️⃣ MERGE WAV FILES
@@ -666,7 +380,7 @@ ipcMain.handle("process:start", async (event, config) => {
         .format("wav")
         .on("progress", (p) => {
           if (p.percent)
-            log(`[Run ${runIndex}] Merging WAV: ${Math.floor(p.percent)}%`);
+            log(`[Run ${runIndex}] Merging WAV (${label}): ${Math.floor(p.percent)}%`);
         })
         .on("error", reject)
         .on("end", resolve)
@@ -688,7 +402,7 @@ ipcMain.handle("process:start", async (event, config) => {
         .on("progress", (p) => {
           if (p.percent)
             log(
-              `[Run ${runIndex}] Converting to MP3: ${Math.floor(p.percent)}%`,
+              `[Run ${runIndex}] Converting to MP3 (${label}): ${Math.floor(p.percent)}%`,
             );
         })
         .on("error", reject)
@@ -700,80 +414,57 @@ ipcMain.handle("process:start", async (event, config) => {
     fs.unlinkSync(tempWavOutput);
 
     // ==============================
-    // 📝 EXPORT TXT DANH SÁCH GHÉP (only for final outputs, not temp)
+    // 📝 EXPORT TXT DANH SÁCH GHÉP
     // ==============================
 
-    if (!runIndex.toString().includes("output2")) {
-      // Only create log for final outputs, not intermediate temp files
-      const finalOutputName = `output_${runIndex}_${Date.now()}.mp3`;
-      const finalOutputPath = path.join(output, finalOutputName);
+    const suffix = label === 'G2' ? '_G2' : '';
+    const finalOutputName = `output_${runIndex}${suffix}_${Date.now()}.mp3`;
+    const finalOutputPath = path.join(output, finalOutputName);
 
-      // Copy temp file to final location
-      fs.copyFileSync(outputPath, finalOutputPath);
+    // Copy temp file to final location
+    fs.copyFileSync(outputPath, finalOutputPath);
+    fs.unlinkSync(outputPath);
 
-      const logFileName = finalOutputName.replace(".mp3", "_log.txt");
-      const logFilePath = path.join(output, logFileName);
-
-      let logFileContent = "";
-
-      // Header
-      logFileContent += `Run: ${runIndex}/${runCount}\n`;
-      logFileContent += `Output file: ${finalOutputName}\n`;
-      logFileContent += `Tổng số file ghép: ${finalList.length}\n`;
-      logFileContent += `Duration target: ${loop ? duration : "không giới hạn"}s\n`;
-      logFileContent += `Duration actual: ${verify.toFixed(3)}s\n`;
-      logFileContent += `${"=".repeat(80)}\n`;
-
-      logFileContent += `\n`;
-      logFileContent += `Danh sách file theo thứ tự:\n`;
-      logFileContent += `${"=".repeat(80)}\n\n`;
-
-      originalFilesList.forEach((file, index) => {
-        const fileName = path.basename(file);
-        const fileDir = path.dirname(file);
-        const sourceFolderName = path.basename(fileDir);
-
-        logFileContent += `${index + 1}. ${fileName}\n`;
-        logFileContent += `   Thư mục: ${sourceFolderName}\n`;
-        logFileContent += `   Đường dẫn: ${file}\n\n`;
-      });
-
-      fs.writeFileSync(logFilePath, logFileContent, "utf-8");
-      log(`[Run ${runIndex}] Đã tạo file log: ${logFileName}`);
-
-      // Clean up temp file
-      fs.unlinkSync(outputPath);
-
-      log(`✓ Hoàn thành Run ${runIndex}: ${finalOutputName}`, "success");
-
-      return {
-        path: finalOutputPath,
-        duration: verify,
-        name: finalOutputName,
-        logFilePath: logFilePath,
-        originalFiles: originalFilesList,
-      };
-    }
-
-    // ==============================
-    // 7️⃣ CLEAN TEMP FILES
-    // ==============================
-
+    // Cleanup WAV temp files
     wavFilesList.forEach((f) => {
-      try {
-        if (fs.existsSync(f)) {
-          fs.unlinkSync(f);
-        }
-      } catch (err) {
-        console.error(`Error cleaning up ${f}:`, err);
-      }
+      try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (err) {}
     });
 
-    log(
-      `[Run ${runIndex}] Đã dọn dẹp ${wavFilesList.length} file WAV tạm thời`,
-    );
+    const logFileName = finalOutputName.replace(".mp3", "_log.txt");
+    const logFilePath = path.join(output, logFileName);
 
-    return { path: outputPath, duration: verify, name: outputName, originalFiles: originalFilesList };
+    let logFileContent = "";
+    logFileContent += `Run: ${runIndex}/${runCount} (${label})\n`;
+    logFileContent += `Output file: ${finalOutputName}\n`;
+    logFileContent += `Tổng số file ghép: ${finalList.length}\n`;
+    logFileContent += `Duration actual: ${verify.toFixed(3)}s\n`;
+    logFileContent += `${"=".repeat(80)}\n`;
+    logFileContent += `\n`;
+    logFileContent += `Danh sách file theo thứ tự:\n`;
+    logFileContent += `${"=".repeat(80)}\n\n`;
+
+    originalFilesList.forEach((file, index) => {
+      const fileName = path.basename(file);
+      const fileDir = path.dirname(file);
+      const sourceFolderName = path.basename(fileDir);
+
+      logFileContent += `${index + 1}. ${fileName}\n`;
+      logFileContent += `   Thư mục: ${sourceFolderName}\n`;
+      logFileContent += `   Đường dẫn: ${file}\n\n`;
+    });
+
+    fs.writeFileSync(logFilePath, logFileContent, "utf-8");
+    log(`[Run ${runIndex}] Đã tạo file log (${label}): ${logFileName}`);
+
+    log(`✓ Hoàn thành Run ${runIndex} (${label}): ${finalOutputName}`, "success");
+
+    return {
+      path: finalOutputPath,
+      duration: verify,
+      name: finalOutputName,
+      logFilePath: logFilePath,
+      originalFiles: originalFilesList,
+    };
   };
 
   // ==========================================
@@ -786,19 +477,15 @@ ipcMain.handle("process:start", async (event, config) => {
       !fs.existsSync(input2.path) ||
       !fs.existsSync(input3.path)
     ) {
-      throw new Error("Một hoặc nhiều thư mục đầu vào không tồn tại.");
+      throw new Error("Một hoặc nhiều thư mục đầu vào Group 1 không tồn tại.");
     }
 
-    if (enableOutput2) {
-      if (
-        !fs.existsSync(output2Input1.path) ||
-        !fs.existsSync(output2Input2.path) ||
-        !fs.existsSync(output2Input3.path)
-      ) {
-        throw new Error(
-          "Một hoặc nhiều thư mục đầu vào Output 2 không tồn tại.",
-        );
-      }
+    if (
+      !fs.existsSync(group2input1.path) ||
+      !fs.existsSync(group2input2.path) ||
+      !fs.existsSync(group2input3.path)
+    ) {
+      throw new Error("Một hoặc nhiều thư mục đầu vào Group 2 không tồn tại.");
     }
 
     log(`Bắt đầu xử lý ${runCount} lần song song...`);
@@ -815,7 +502,7 @@ ipcMain.handle("process:start", async (event, config) => {
 
     sender.send(
       "process:complete",
-      `Thành công! Đã tạo ${runCount} file output.`,
+      `Thành công! Đã tạo ${runCount * 2} file output (${runCount} G1 + ${runCount} G2).`,
     );
   } catch (err) {
     log(`Error: ${err.message}`, "error");
