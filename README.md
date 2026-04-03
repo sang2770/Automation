@@ -11,6 +11,7 @@ An automated tool to mix WAV files from 3 input folders based on user-defined co
   - Loops Input 1 + Input 2 until the total duration is met.
   - Appends Input 3 as the ending.
 - **No Loop Mode**: Concatenates selected files once (Input 1 -> Input 2 -> Input 3).
+- **Group 2 Output**: Mirrors Input 1 and Input 2 only.
 - **Audio Processing**: Uses `fluent-ffmpeg` for seamless concatenation.
 
 ## How to Run

@@ -16,9 +16,6 @@ const pathG2Input1 = document.getElementById('path-g2-input1');
 const btnG2Input2 = document.getElementById('btn-g2-input2');
 const pathG2Input2 = document.getElementById('path-g2-input2');
 
-const btnG2Input3 = document.getElementById('btn-g2-input3');
-const pathG2Input3 = document.getElementById('path-g2-input3');
-
 const btnOutput = document.getElementById('btn-output');
 const pathOutput = document.getElementById('path-output');
 
@@ -39,7 +36,6 @@ let paths = {
     input3: null,
     g2input1: null,
     g2input2: null,
-    g2input3: null,
     output: null
 };
 
@@ -61,7 +57,6 @@ btnInput2.addEventListener('click', () => selectFolder('input2', pathInput2));
 btnInput3.addEventListener('click', () => selectFolder('input3', pathInput3));
 btnG2Input1.addEventListener('click', () => selectFolder('g2input1', pathG2Input1));
 btnG2Input2.addEventListener('click', () => selectFolder('g2input2', pathG2Input2));
-btnG2Input3.addEventListener('click', () => selectFolder('g2input3', pathG2Input3));
 btnOutput.addEventListener('click', () => selectFolder('output', pathOutput));
 
 btnProcess.addEventListener('click', async () => {
@@ -77,7 +72,6 @@ btnProcess.addEventListener('click', async () => {
     if (!paths.input3) missing.push("Đầu vào 3");
     if (!paths.g2input1) missing.push("G2 - Đầu vào 1");
     if (!paths.g2input2) missing.push("G2 - Đầu vào 2");
-    if (!paths.g2input3) missing.push("G2 - Đầu vào 3");
     if (!paths.output) missing.push("Đầu ra");
 
     if (missing.length > 0) {
@@ -93,14 +87,13 @@ btnProcess.addEventListener('click', async () => {
         input3: { path: paths.input3, count: parseInt(countInput3.value) || 1 },
         group2input1: { path: paths.g2input1 },
         group2input2: { path: paths.g2input2 },
-        group2input3: { path: paths.g2input3 },
         output: paths.output,
         runCount: runCount
     };
 
     btnProcess.disabled = true;
     btnProcess.textContent = 'Đang xử lý...';
-    
+
     log(`Bắt đầu xử lý ${runCount} lần (Chế độ Không Lặp)...`, 'info');
     try {
         await window.electronAPI.processAudio(config);
@@ -144,10 +137,10 @@ async function checkActivationStatus() {
     try {
         checkActivationBtn.disabled = true;
         checkActivationBtn.textContent = 'Đang kiểm tra...';
-        
+
         log('Đang kiểm tra trạng thái kích hoạt...', 'info');
         const result = await window.electronAPI.checkActivation(currentDeviceId);
-        
+
         if (result.active) {
             isActivated = true;
             activationStatus.textContent = 'Đã kích hoạt';
@@ -194,7 +187,6 @@ function getSettings() {
         input3: { path: paths.input3, count: countInput3.value },
         g2input1: { path: paths.g2input1 },
         g2input2: { path: paths.g2input2 },
-        g2input3: { path: paths.g2input3 },
         output: paths.output,
         runCount: runCountInput.value
     };
@@ -240,12 +232,6 @@ async function loadSettings() {
         paths.g2input2 = settings.g2input2.path;
         pathG2Input2.textContent = paths.g2input2 || 'Chưa chọn thư mục...';
         pathG2Input2.title = paths.g2input2 || '';
-    }
-
-    if (settings.g2input3) {
-        paths.g2input3 = settings.g2input3.path;
-        pathG2Input3.textContent = paths.g2input3 || 'Chưa chọn thư mục...';
-        pathG2Input3.title = paths.g2input3 || '';
     }
 
     if (settings.output) {

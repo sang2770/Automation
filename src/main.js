@@ -206,7 +206,6 @@ ipcMain.handle("process:start", async (event, config) => {
     input3,
     group2input1,
     group2input2,
-    group2input3,
     output,
     runCount = 1,
   } = config;
@@ -221,12 +220,13 @@ ipcMain.handle("process:start", async (event, config) => {
     log(`\n=== Bắt đầu lần chạy ${runIndex}/${runCount} ===`);
     const g1Result = await processSingleOutput(runIndex);
     log(`[Run ${runIndex}] Bắt đầu tạo Output 2 (Group 2)...`);
-    await processGroup2Output(runIndex, g1Result.originalFiles);
+    await processGroup2Output(runIndex, g1Result.group2SourceFiles);
   };
 
   const processSingleOutput = async (runIndex) => {
     const finalList = [];
-    const originalFilesList = []; // Track original MP3 file paths
+    const originalFilesList = []; // Track all original MP3 file paths for Group 1 output log
+    const group2SourceFiles = []; // Track only files that Group 2 should mirror
     const wavFilesList = []; // Track WAV files for cleanup
 
     // ==============================
@@ -260,21 +260,22 @@ ipcMain.handle("process:start", async (event, config) => {
     let currentDuration = 0;
 
     // KHÔNG LOOP — chỉ lấy 1 lượt
-      const files1 = getRandomFiles(input1.path, input1.count);
-      const files2 = getRandomFiles(input2.path, input2.count);
+    const files1 = getRandomFiles(input1.path, input1.count);
+    const files2 = getRandomFiles(input2.path, input2.count);
 
-      if (files1.length === 0 && files2.length === 0)
-        throw new Error("Không tìm thấy file trong Input1 hoặc Input2.");
+    if (files1.length === 0 && files2.length === 0)
+      throw new Error("Không tìm thấy file trong Input1 hoặc Input2.");
 
-      for (const file of [...files1, ...files2]) {
-        // Convert to WAV first
-        const wavFile = await convertToWav(file);
-        wavFilesList.push(wavFile);
+    for (const file of [...files1, ...files2]) {
+      // Convert to WAV first
+      const wavFile = await convertToWav(file);
+      wavFilesList.push(wavFile);
 
-        mainList.push(wavFile);
-        originalFilesList.push(file); // Track original MP3
-        currentDuration += await getDuration(wavFile);
-      }
+      mainList.push(wavFile);
+      originalFilesList.push(file); // Track original MP3
+      group2SourceFiles.push(file);
+      currentDuration += await getDuration(wavFile);
+    }
 
     // ==============================
     // 3️⃣ GHÉP ENDING
@@ -294,7 +295,7 @@ ipcMain.handle("process:start", async (event, config) => {
 
     log(`[Run ${runIndex}] Duration cuối cùng: ${verify.toFixed(3)}s`);
     originalFilesList.push(...files3);
-    return await finalizeOutput(
+    const g1Output = await finalizeOutput(
       runIndex,
       finalList,
       originalFilesList,
@@ -302,6 +303,11 @@ ipcMain.handle("process:start", async (event, config) => {
       verify,
       'G1',
     );
+
+    return {
+      ...g1Output,
+      group2SourceFiles,
+    };
   };
 
   const processGroup2Output = async (runIndex, group1Files) => {
@@ -320,8 +326,6 @@ ipcMain.handle("process:start", async (event, config) => {
         g2Dir = group2input1.path;
       else if (normalizedOrig.startsWith(path.normalize(input2.path) + path.sep))
         g2Dir = group2input2.path;
-      else if (normalizedOrig.startsWith(path.normalize(input3.path) + path.sep))
-        g2Dir = group2input3.path;
 
       if (!g2Dir)
         throw new Error(`Không thể xác định thư mục Group 2 cho file: ${fileName}`);
@@ -427,7 +431,7 @@ ipcMain.handle("process:start", async (event, config) => {
 
     // Cleanup WAV temp files
     wavFilesList.forEach((f) => {
-      try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (err) {}
+      try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (err) { }
     });
 
     const logFileName = finalOutputName.replace(".mp3", "_log.txt");
@@ -482,8 +486,7 @@ ipcMain.handle("process:start", async (event, config) => {
 
     if (
       !fs.existsSync(group2input1.path) ||
-      !fs.existsSync(group2input2.path) ||
-      !fs.existsSync(group2input3.path)
+      !fs.existsSync(group2input2.path)
     ) {
       throw new Error("Một hoặc nhiều thư mục đầu vào Group 2 không tồn tại.");
     }
