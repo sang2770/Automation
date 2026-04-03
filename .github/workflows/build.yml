@@ -2,9 +2,9 @@ name: Build Windows App
 
 on:
   push:
-    branches: ["feature/music"]
+    branches: ["feature/v2"]
   pull_request:
-    branches: ["feature/music"]
+    branches: ["feature/v2"]
   workflow_dispatch: # Allow manual triggering
 
 permissions:
@@ -53,7 +53,7 @@ jobs:
           retention-days: 30
 
       - name: Create GitHub Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/music'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/v2'
         uses: softprops/action-gh-release@v2
         with:
           delete_release: true
