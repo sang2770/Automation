@@ -299,88 +299,110 @@ ipcMain.handle("process:start", async (event, config) => {
     verify,
     label = 'G1',
   ) => {
-    // ==============================
-    // 5️⃣ CONCAT MP3 FILES DIRECTLY
-    // ==============================
-
     const listPath = path.join(
       app.getPath("temp"),
       `concat_${runIndex}_${label}_${Date.now()}.txt`,
     );
 
-    const listContent = finalList
-      .map((f) => `file '${f.replace(/'/g, "'\\''")}'`)
-      .join("\n");
-
-    fs.writeFileSync(listPath, listContent);
-
     const outputName = `temp_output_${runIndex}_${label}_${Date.now()}.mp3`;
     const outputPath = path.join(app.getPath("temp"), outputName);
 
-    await new Promise((resolve, reject) => {
-      ffmpeg()
-        .input(listPath)
-        .inputOptions(["-f", "concat", "-safe", "0"])
-        .audioCodec("copy")
-        .on("progress", (p) => {
-          log(`[Run ${runIndex}] Joining MP3 (${label})...`);
-        })
-        .on("error", (err) => {
-          log(`Error in ffmpeg joining: ${err.message}`, "error");
-          reject(err);
-        })
-        .on("end", resolve)
-        .save(outputPath);
-    });
+    try {
+      // ==============================
+      // 5️⃣ CONCAT MP3 FILES DIRECTLY
+      // ==============================
 
-    // ==============================
-    // 📝 EXPORT FINAL FILE & LOG
-    // ==============================
+      const listContent = finalList
+        .map((f) => `file '${f.replace(/'/g, "'\\''")}'`)
+        .join("\n");
 
-    const suffix = label === 'G2' ? '_G2' : '';
-    const finalOutputName = `output_${runIndex}${suffix}_${Date.now()}.mp3`;
-    const finalOutputPath = path.join(output, finalOutputName);
+      fs.writeFileSync(listPath, listContent);
 
-    // Move temp file to final location
-    fs.copyFileSync(outputPath, finalOutputPath);
-    fs.unlinkSync(outputPath);
-    fs.unlinkSync(listPath);
+      await new Promise((resolve, reject) => {
+        ffmpeg()
+          .input(listPath)
+          .inputOptions(["-f", "concat", "-safe", "0"])
+          .outputOptions([
+            "-acodec", "copy",
+          ])
+          .on("progress", (p) => {
+            // log(`[Run ${runIndex}] Joining MP3 (${label})...`);
+          })
+          .on("error", (err) => {
+            log(`Error in ffmpeg joining: ${err.message}`, "error");
+            reject(err);
+          })
+          .on("end", resolve)
+          .save(outputPath);
+      });
 
-    const logFileName = finalOutputName.replace(".mp3", "_log.txt");
-    const logFilePath = path.join(output, logFileName);
+      // ==============================
+      // 📝 EXPORT FINAL FILE & LOG
+      // ==============================
 
-    let logFileContent = "";
-    logFileContent += `Run: ${runIndex}/${runCount} (${label})\n`;
-    logFileContent += `Output file: ${finalOutputName}\n`;
-    logFileContent += `Tổng số file ghép: ${finalList.length}\n`;
-    logFileContent += `Duration actual: ${verify.toFixed(3)}s\n`;
-    logFileContent += `${"=".repeat(80)}\n`;
-    logFileContent += `\n`;
-    logFileContent += `Danh sách file theo thứ tự:\n`;
-    logFileContent += `${"=".repeat(80)}\n\n`;
+      const suffix = label === 'G2' ? '_G2' : '';
+      const finalOutputName = `output_${runIndex}${suffix}_${Date.now()}.mp3`;
+      const finalOutputPath = path.join(output, finalOutputName);
 
-    originalFilesList.forEach((file, index) => {
-      const fileName = path.basename(file);
-      const fileDir = path.dirname(file);
-      const sourceFolderName = path.basename(fileDir);
+      if (!fs.existsSync(outputPath)) {
+        throw new Error(`Không tìm thấy file kết quả sau khi ghép: ${outputPath}`);
+      }
 
-      logFileContent += `${index + 1}. ${fileName}\n`;
-      logFileContent += `   Thư mục: ${sourceFolderName}\n`;
-      logFileContent += `   Đường dẫn: ${file}\n\n`;
-    });
+      // Move temp file to final location
+      fs.copyFileSync(outputPath, finalOutputPath);
 
-    fs.writeFileSync(logFilePath, logFileContent, "utf-8");
-    log(`[Run ${runIndex}] Đã tạo file log (${label}): ${logFileName}`);
+      // Dọn dẹp file tạm ngay sau khi copy thành công
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+      if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
 
-    log(`✓ Hoàn thành Run ${runIndex} (${label}): ${finalOutputName}`, "success");
+      const logFileName = finalOutputName.replace(".mp3", "_log.txt");
+      const logFilePath = path.join(output, logFileName);
 
-    return {
-      path: finalOutputPath,
-      duration: verify,
-      name: finalOutputName,
-      logFilePath: logFilePath,
-      originalFiles: originalFilesList,
-    };
+      let logFileContent = "";
+      logFileContent += `Run: ${runIndex}/${runCount} (${label})\n`;
+      logFileContent += `Output file: ${finalOutputName}\n`;
+      logFileContent += `Tổng số file ghép: ${finalList.length}\n`;
+      logFileContent += `Duration actual: ${verify.toFixed(3)}s\n`;
+      logFileContent += `${"=".repeat(80)}\n`;
+      logFileContent += `\n`;
+      logFileContent += `Danh sách file theo thứ tự:\n`;
+      logFileContent += `${"=".repeat(80)}\n\n`;
+
+      originalFilesList.forEach((file, index) => {
+        const fileName = path.basename(file);
+        const fileDir = path.dirname(file);
+        const sourceFolderName = path.basename(fileDir);
+
+        logFileContent += `${index + 1}. ${fileName}\n`;
+        logFileContent += `   Thư mục: ${sourceFolderName}\n`;
+        logFileContent += `   Đường dẫn: ${file}\n\n`;
+      });
+
+      fs.writeFileSync(logFilePath, logFileContent, "utf-8");
+      log(`[Run ${runIndex}] Đã tạo file log (${label}): ${logFileName}`);
+
+      log(`✓ Hoàn thành Run ${runIndex} (${label}): ${finalOutputName}`, "success");
+
+      return {
+        path: finalOutputPath,
+        duration: verify,
+        name: finalOutputName,
+        logFilePath: logFilePath,
+        originalFiles: originalFilesList,
+      };
+    } catch (error) {
+      log(`[Run ${runIndex}] Lỗi trong finalizeOutput (${label}): ${error.message}`, "error");
+
+      // Dọn dẹp file tạm nếu có lỗi xảy ra
+      try {
+        if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
+        if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+      } catch (cleanupErr) {
+        console.error("Lỗi khi dọn dẹp trong catch:", cleanupErr);
+      }
+
+      throw error; // Quăng lỗi để process:start xử lý tiếp
+    }
   };
 
   // ==========================================
