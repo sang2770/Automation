@@ -491,11 +491,19 @@ ipcMain.handle("process:start", async (event, config) => {
       throw new Error("Một hoặc nhiều thư mục đầu vào Group 2 không tồn tại.");
     }
 
-    log(`Bắt đầu xử lý ${runCount} lần song song...`);
+    log(`Bắt đầu xử lý ${runCount} lần (giới hạn 2 luồng song song)...`);
 
+    const maxConcurrency = 2; // Giới hạn số luồng FFmpeg chạy song song
+    const executing = new Set();
     const promises = [];
+
     for (let i = 1; i <= runCount; i++) {
-      promises.push(processSingleRun(i));
+      const p = processSingleRun(i).finally(() => executing.delete(p));
+      promises.push(p);
+      executing.add(p);
+      if (executing.size >= maxConcurrency) {
+        await Promise.race(executing);
+      }
     }
 
     await Promise.all(promises);
