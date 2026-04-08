@@ -406,6 +406,15 @@ function isValidEmail_(email) {
       await page.click("#passwordNext");
       await page.waitForTimeout(3000);
 
+      try {
+        await page.locator('text=Google Authenticator').isVisible({ timeout: 5000 });
+        this.sendMessage("progress", `Handling Google Authenticator prompt for ${email}`);
+        await page.click('text=Google Authenticator');
+        await this.delay(5000);
+      } catch (error) {
+        // TODO: Handle other potential post-login prompts (e.g. suspicious login, new device confirmation, etc.)
+      }
+
       // Handle 2FA if required
       if (
         !secretKey.includes("@") &&
