@@ -479,10 +479,6 @@ ipcMain.handle("device:getId", async () => {
 });
 
 ipcMain.handle("activation:check", async (event, deviceId) => {
-  return {
-    active: true,
-    message: "Thiết bị đã được kích hoạt",
-  }
   try {
     // Google Sheets CSV export URL
     const SHEET_ID = "1ZBWgZXISKT_dZGXlnp9ibB2PpypQepAJCppg3UEjl3k";
