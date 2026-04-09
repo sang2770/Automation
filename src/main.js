@@ -163,7 +163,6 @@ ipcMain.handle("process:start", async (event, config) => {
   const {
     input1,
     input2,
-    input3,
     group2input1,
     group2input2,
     output,
@@ -188,22 +187,7 @@ ipcMain.handle("process:start", async (event, config) => {
     const originalFilesList = []; // Track all original MP3 file paths
     const group2SourceFiles = []; // Track only files that Group 2 should mirror
 
-    // ==============================
-    // 1️⃣ LẤY INPUT 3 (ENDING)
-    // ==============================
 
-    const files3 = getRandomFiles(input3.path, input3.count);
-    if (files3.length === 0)
-      throw new Error("Không tìm thấy file trong Input 3.");
-
-    log(`[Run ${runIndex}] Đang lấy thông tin Input3 files...`);
-    let duration3 = 0;
-
-    for (const f of files3) {
-      duration3 += await getDuration(f);
-    }
-
-    log(`[Run ${runIndex}] Input3 duration: ${duration3.toFixed(3)}s`);
 
     // ==============================
     // 2️⃣ BUILD MAIN LIST (1+2)
@@ -230,7 +214,7 @@ ipcMain.handle("process:start", async (event, config) => {
     // ==============================
 
     finalList.push(...mainList);
-    finalList.push(...files3);
+
 
     // ==============================
     // 4️⃣ VERIFY FINAL DURATION
@@ -242,7 +226,7 @@ ipcMain.handle("process:start", async (event, config) => {
     }
 
     log(`[Run ${runIndex}] Duration cuối cùng: ${verify.toFixed(3)}s`);
-    originalFilesList.push(...files3);
+
 
     const g1Output = await finalizeOutput(
       runIndex,
@@ -412,8 +396,7 @@ ipcMain.handle("process:start", async (event, config) => {
   try {
     if (
       !fs.existsSync(input1.path) ||
-      !fs.existsSync(input2.path) ||
-      !fs.existsSync(input3.path)
+      !fs.existsSync(input2.path)
     ) {
       throw new Error("Một hoặc nhiều thư mục đầu vào Group 1 không tồn tại.");
     }
