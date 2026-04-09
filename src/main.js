@@ -164,6 +164,7 @@ ipcMain.handle("process:start", async (event, config) => {
     input1,
     input2,
     input3,
+    input4,
     group2input1,
     group2input2,
     group2input3,
@@ -201,11 +202,12 @@ ipcMain.handle("process:start", async (event, config) => {
     const files1 = getRandomFiles(input1.path, input1.count);
     const files2 = getRandomFiles(input2.path, input2.count);
     const files3 = getRandomFiles(input3.path, input3.count);
+    const files4 = getRandomFiles(input4.path, input4.count);
 
-    if (files1.length === 0 && files2.length === 0 && files3.length === 0)
-      throw new Error("Không tìm thấy file trong Input1, Input2 hoặc Input3.");
+    if (files1.length === 0 && files2.length === 0 && files3.length === 0 && files4.length === 0)
+      throw new Error("Không tìm thấy file trong các thư mục Input.");
 
-    for (const file of [...files1, ...files2, ...files3]) {
+    for (const file of [...files1, ...files2, ...files3, ...files4]) {
       mainList.push(file);
       originalFilesList.push(file);
       group2SourceFiles.push(file);
@@ -262,6 +264,8 @@ ipcMain.handle("process:start", async (event, config) => {
         g2Dir = group2input2.path;
       else if (normalizedOrig.startsWith(path.normalize(input3.path) + path.sep))
         g2Dir = group2input3.path;
+      else if (normalizedOrig.startsWith(path.normalize(input4.path) + path.sep))
+        continue;
 
       if (!g2Dir)
         throw new Error(`Không thể xác định thư mục Group 2 cho file: ${fileName}`);
@@ -418,7 +422,8 @@ ipcMain.handle("process:start", async (event, config) => {
     if (
       !fs.existsSync(input1.path) ||
       !fs.existsSync(input2.path) ||
-      !fs.existsSync(input3.path)
+      !fs.existsSync(input3.path) ||
+      !fs.existsSync(input4.path)
     ) {
       throw new Error("Một hoặc nhiều thư mục đầu vào Group 1 không tồn tại.");
     }
