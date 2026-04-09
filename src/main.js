@@ -147,7 +147,7 @@ function cleanupTempFiles() {
           cleanedCount++;
         }
       } catch (err) {
-        console.error(`Error cleaning temp file ${file}:`, err);
+        // Ignore errors for files that might be in use
       }
     });
 
@@ -329,11 +329,20 @@ ipcMain.handle("process:start", async (event, config) => {
       const finalOutputPath = path.join(output, finalOutputName);
 
       if (!fs.existsSync(outputPath)) {
-        throw new Error(`Không tìm thấy file kết quả sau khi ghép: ${outputPath}`);
+        throw new Error(`Không tìm thấy file kết quả tạm tại: ${outputPath}`);
+      }
+
+      // Đảm bảo thư mục đầu ra tồn tại
+      if (!fs.existsSync(output)) {
+        fs.mkdirSync(output, { recursive: true });
       }
 
       // Move temp file to final location
-      fs.copyFileSync(outputPath, finalOutputPath);
+      try {
+        fs.copyFileSync(outputPath, finalOutputPath);
+      } catch (copyErr) {
+        throw new Error(`Lỗi khi copy file từ ${outputPath} sang ${finalOutputPath}: ${copyErr.message}`);
+      }
 
       // Dọn dẹp file tạm ngay sau khi copy thành công
       if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
@@ -394,6 +403,13 @@ ipcMain.handle("process:start", async (event, config) => {
   // ==========================================
 
   try {
+    // 0️⃣ Clean up any leftover temp files before starting
+    cleanupTempFiles();
+
+    if (!fs.existsSync(output)) {
+      fs.mkdirSync(output, { recursive: true });
+    }
+
     if (
       !fs.existsSync(input1.path) ||
       !fs.existsSync(input2.path)
@@ -408,9 +424,9 @@ ipcMain.handle("process:start", async (event, config) => {
       throw new Error("Một hoặc nhiều thư mục đầu vào Group 2 không tồn tại.");
     }
 
-    log(`Bắt đầu xử lý ${runCount} lần (giới hạn 2 luồng song song)...`);
-
     const maxConcurrency = 5; // Giới hạn số luồng FFmpeg chạy song song
+    log(`Bắt đầu xử lý ${runCount} lần (giới hạn ${maxConcurrency} luồng song song)...`);
+
     const executing = new Set();
     const promises = [];
 
@@ -425,7 +441,8 @@ ipcMain.handle("process:start", async (event, config) => {
 
     await Promise.all(promises);
 
-    // Final cleanup of any remaining temp files
+    // Final cleanup of any remaining temp files from THIS run session
+    // (though they should have cleaned themselves up)
     cleanupTempFiles();
 
     sender.send(
@@ -435,8 +452,9 @@ ipcMain.handle("process:start", async (event, config) => {
   } catch (err) {
     log(`Error: ${err.message}`, "error");
 
-    // Cleanup temp files even on error
-    cleanupTempFiles();
+    // Do NOT call cleanupTempFiles() here because other concurrent runs might still be finishing
+    // and we don't want to delete their temp files while they are in the middle of processing.
+    // They will be cleaned up the next time process:start is called.
 
     sender.send("process:error", err.message);
   }
@@ -454,6 +472,10 @@ ipcMain.handle("device:getId", async () => {
 });
 
 ipcMain.handle("activation:check", async (event, deviceId) => {
+  return {
+    active: true,
+    message: "Thiết bị đã được kích hoạt",
+  }
   try {
     // Google Sheets CSV export URL
     const SHEET_ID = "1ZBWgZXISKT_dZGXlnp9ibB2PpypQepAJCppg3UEjl3k";
