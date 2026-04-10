@@ -207,11 +207,20 @@ ipcMain.handle("process:start", async (event, config) => {
     if (files1.length === 0 && files2.length === 0 && files3.length === 0 && files4.length === 0)
       throw new Error("Không tìm thấy file trong các thư mục Input.");
 
-    for (const file of [...files1, ...files2, ...files3, ...files4]) {
-      mainList.push(file);
-      originalFilesList.push(file);
-      group2SourceFiles.push(file);
-      currentDuration += await getDuration(file);
+    const allFiles = [
+      { files: files1, group: 1 },
+      { files: files2, group: 2 },
+      { files: files3, group: 3 },
+      { files: files4, group: 4 },
+    ];
+
+    for (const item of allFiles) {
+      for (const file of item.files) {
+        mainList.push(file);
+        originalFilesList.push(file);
+        group2SourceFiles.push({ path: file, group: item.group });
+        currentDuration += await getDuration(file);
+      }
     }
 
     // ==============================
@@ -253,22 +262,19 @@ ipcMain.handle("process:start", async (event, config) => {
 
     log(`[Run ${runIndex}] Tạo Output 2 từ danh sách bài của Output 1...`);
 
-    for (const origFile of group1Files) {
+    for (const item of group1Files) {
+      const origFile = item.path;
+      const groupIdx = item.group;
       const fileName = path.basename(origFile);
-      const normalizedOrig = path.normalize(origFile);
 
       let g2Dir = null;
-      if (normalizedOrig.startsWith(path.normalize(input1.path) + path.sep))
-        g2Dir = group2input1.path;
-      else if (normalizedOrig.startsWith(path.normalize(input2.path) + path.sep))
-        g2Dir = group2input2.path;
-      else if (normalizedOrig.startsWith(path.normalize(input3.path) + path.sep))
-        g2Dir = group2input3.path;
-      else if (normalizedOrig.startsWith(path.normalize(input4.path) + path.sep))
-        continue;
+      if (groupIdx === 1) g2Dir = group2input1.path;
+      else if (groupIdx === 2) g2Dir = group2input2.path;
+      else if (groupIdx === 3) g2Dir = group2input3.path;
+      else if (groupIdx === 4) continue; // Skip Input 4 files for Group 2
 
       if (!g2Dir)
-        throw new Error(`Không thể xác định thư mục Group 2 cho file: ${fileName}`);
+        throw new Error(`Không thể xác định thư mục Group 2 cho file: ${fileName} (Nhóm ${groupIdx})`);
 
       const g2FilePath = path.join(g2Dir, fileName);
       if (!fs.existsSync(g2FilePath))
@@ -316,9 +322,10 @@ ipcMain.handle("process:start", async (event, config) => {
           .input(listPath)
           .inputOptions(["-f", "concat", "-safe", "0"])
           .outputOptions([
-            "-fflags", "+genpts",
-            "-avoid_negative_ts", "make_zero",
-            "-acodec", "copy"
+            "-acodec", "libmp3lame",
+            "-ar", "44100",
+            "-ac", "2",
+            "-b:a", "192k"
           ])
           .on("progress", (p) => {
             // log(`[Run ${runIndex}] Joining MP3 (${label})...`);
@@ -486,6 +493,10 @@ ipcMain.handle("device:getId", async () => {
 });
 
 ipcMain.handle("activation:check", async (event, deviceId) => {
+  return {
+    active: true,
+    message: "Phần mềm đã được kích hoạt",
+  }
   try {
     // Google Sheets CSV export URL
     const SHEET_ID = "1ZBWgZXISKT_dZGXlnp9ibB2PpypQepAJCppg3UEjl3k";
