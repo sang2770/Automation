@@ -316,7 +316,9 @@ ipcMain.handle("process:start", async (event, config) => {
           .input(listPath)
           .inputOptions(["-f", "concat", "-safe", "0"])
           .outputOptions([
-            "-acodec", "copy",
+            "-fflags", "+genpts",
+            "-avoid_negative_ts", "make_zero",
+            "-acodec", "copy"
           ])
           .on("progress", (p) => {
             // log(`[Run ${runIndex}] Joining MP3 (${label})...`);
