@@ -461,6 +461,20 @@ function isValidEmail_(email) {
 
       // Handle "Not now" or "Skip" buttons
       try {
+        // Array.from(document.querySelectorAll("button")).map(item => item.innerText);
+        await page.evaluate(() => {
+          const buttons = Array.from(document.querySelectorAll("button"));
+          const targetButton = buttons.find(button => {
+            const text = button.innerText.toLowerCase();
+            return text.includes("not now") || text.includes("skip");
+          });
+          if (targetButton) {
+            targetButton.click();
+          }
+        });
+
+        await this.delay(2000);
+
         if (
           await page
             .locator('button:has-text("Not now"), button:has-text("Skip")')
@@ -470,9 +484,13 @@ function isValidEmail_(email) {
             .locator('button:has-text("Not now"), button:has-text("Skip")')
             .click();
           await this.delay(2000);
+          this.sendMessage("progress", "Đã bấm not now")
+        } else {
+          this.sendMessage("progress", `No "Not now" or "Skip" button found for ${email}, continuing...`);
         }
       } catch (error) {
         // Ignore if not found
+        this.sendMessage("error", `No "Not now" or "Skip" button found for ${email}, continuing... ${error.message}`);
       }
 
       this.sendMessage("progress", `Creating new Google Sheet for ${email}`);
