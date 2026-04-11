@@ -562,7 +562,7 @@ function isValidEmail_(email) {
       // Execute functions in Apps Script
       await this.executeFunction(newPage, this.getPermissionRequiredFunction());
       this.sendMessage("progress", `Permission function executed for ${email}`);
-
+      await this.delay(5000);
       // Handle permission authorization
       await this.handlePermissionAuthorization(browser, newPage, secretKey);
 
@@ -573,7 +573,7 @@ function isValidEmail_(email) {
       );
       await this.executeFunction(newPage, fillDataFunc);
       this.sendMessage("progress", `Fill data function executed for ${email}`);
-
+      await this.delay(5000);
       await this.handlePermissionAuthorization(browser, newPage, secretKey, true);
       await this.delay(5000);
 
@@ -583,7 +583,7 @@ function isValidEmail_(email) {
         "progress",
         `Send emails function executed for ${email}`,
       );
-
+      await this.delay(5000);
       await this.handlePermissionAuthorization(browser, newPage, secretKey, true);
 
       // Monitor execution and re-run if needed
@@ -683,9 +683,9 @@ function isValidEmail_(email) {
   // Handle permission authorization
   async handlePermissionAuthorization(browser, newPage, secretKey, recheck = false) {
     try {
-      await this.delay(recheck ? 5000 : 10000);
+      await this.delay(10000);
       try {
-        await newPage.click('text=Review Permissions', { timeout: recheck ? 5000 : 15000 });
+        await newPage.click('text=Review Permissions', { timeout: 15000 });
         console.log("Clicked Review Permissions button");
       } catch {
         await newPage.evaluate(async () => {
@@ -809,7 +809,7 @@ function isValidEmail_(email) {
               const texts = lastItem.querySelectorAll("div");
 
               const errorDiv = Array.from(texts).find((div) =>
-                div.textContent.includes("Exceeded maximum execution time"),
+                div.textContent.includes("Exceeded maximum execution time") || div.textContent.includes("too many times"),
               );
 
               if (errorDiv) {
