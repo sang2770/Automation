@@ -486,11 +486,11 @@ function isValidEmail_(email) {
           await this.delay(2000);
           this.sendMessage("progress", "Đã bấm not now")
         } else {
-          this.sendMessage("progress", `No "Not now" or "Skip" button found for ${email}, continuing...`);
+          this.sendMessage("progress", `Không tìm thấy nút not now hoặc skip cho ${email}, tiếp tục...`);
         }
       } catch (error) {
         // Ignore if not found
-        this.sendMessage("error", `No "Not now" or "Skip" button found for ${email}, continuing... ${error.message}`);
+        this.sendMessage("error", `Không tìm thấy nút not now hoặc skip cho ${email}, tiếp tục... ${error.message}`);
       }
 
       this.sendMessage("progress", `Creating new Google Sheet for ${email}`);
@@ -508,6 +508,11 @@ function isValidEmail_(email) {
       await page.reload();
       await this.delay(5000);
 
+      //  Check url is Login
+      if (page.url().includes("signin")) {
+        this.sendMessage("error", `Tài khoản ${email} chưa đăng nhập thành công`);
+        return;
+      }
       // Navigate to specific spreadsheet (if needed)
       // await page.goto(
       //   "https://docs.google.com/spreadsheets/d/1mVQ44j5Q0ecnrXIglQ4QxtV3eJHSZQpRFSRQI1VgvTo/edit?gid=0#gid=0",
