@@ -38,7 +38,8 @@ class WorkerProcess {
 
     return {
       userAgent: userAgents[Math.floor(Math.random() * userAgents.length)],
-      viewport: viewportPresets[Math.floor(Math.random() * viewportPresets.length)],
+      viewport:
+        viewportPresets[Math.floor(Math.random() * viewportPresets.length)],
       locale: "en-US",
       timezoneId: "America/New_York",
       colorScheme: "light",
@@ -86,11 +87,10 @@ class WorkerProcess {
       });
 
       const originalQuery = window.navigator.permissions.query;
-      window.navigator.permissions.query = (parameters) => (
+      window.navigator.permissions.query = (parameters) =>
         parameters && parameters.name === "notifications"
           ? Promise.resolve({ state: Notification.permission })
-          : originalQuery(parameters)
-      );
+          : originalQuery(parameters);
     }, profile);
   }
 
@@ -107,8 +107,9 @@ class WorkerProcess {
   }
 
   isManualCloseError(error) {
-    const msg = (error && error.message ? error.message : String(error || ""))
-      .toLowerCase();
+    const msg = (
+      error && error.message ? error.message : String(error || "")
+    ).toLowerCase();
 
     return (
       msg.includes("target page, context or browser has been closed") ||
@@ -200,7 +201,11 @@ function showAuthorizationPopup() {
   // Get send emails function
   getSendEmailsFunction() {
     // Use custom function from config if available, otherwise use default
-    if (this.config && this.config.customSendEmailsFunction && this.config.customSendEmailsFunction.trim()) {
+    if (
+      this.config &&
+      this.config.customSendEmailsFunction &&
+      this.config.customSendEmailsFunction.trim()
+    ) {
       return this.config.customSendEmailsFunction;
     }
 
@@ -318,9 +323,15 @@ function isValidEmail_(email) {
   async cleanupUserDataDir(userDataDir) {
     try {
       await fs.promises.rmdir(userDataDir, { recursive: true });
-      this.sendMessage("info", `Cleaned up user data directory: ${userDataDir}`);
+      this.sendMessage(
+        "info",
+        `Cleaned up user data directory: ${userDataDir}`,
+      );
     } catch (error) {
-      this.sendMessage("warn", `Failed to clean up user data directory: ${userDataDir} - ${error.message}`);
+      this.sendMessage(
+        "warn",
+        `Failed to clean up user data directory: ${userDataDir} - ${error.message}`,
+      );
       console.error(error);
     }
   }
@@ -407,9 +418,14 @@ function isValidEmail_(email) {
       await page.waitForTimeout(3000);
 
       try {
-        await page.locator('text=Google Authenticator').isVisible({ timeout: 5000 });
-        this.sendMessage("progress", `Handling Google Authenticator prompt for ${email}`);
-        await page.click('text=Google Authenticator');
+        await page
+          .locator("text=Google Authenticator")
+          .isVisible({ timeout: 5000 });
+        this.sendMessage(
+          "progress",
+          `Handling Google Authenticator prompt for ${email}`,
+        );
+        await page.click("text=Google Authenticator");
         await this.delay(5000);
       } catch (error) {
         // TODO: Handle other potential post-login prompts (e.g. suspicious login, new device confirmation, etc.)
@@ -418,9 +434,9 @@ function isValidEmail_(email) {
       // Handle 2FA if required
       if (
         !secretKey.includes("@") &&
-        await page
+        (await page
           .locator('input[type="tel"], input[aria-label*="code"]')
-          .isVisible()
+          .isVisible())
       ) {
         this.sendMessage("progress", `Handling 2FA for ${email}`);
         const code = await this.get2FACode(secretKey);
@@ -439,24 +455,38 @@ function isValidEmail_(email) {
       try {
         if (
           secretKey.includes("@") &&
-          await page.locator('text=Confirm your recovery email')
-            .isVisible()
+          (await page.locator("text=Confirm your recovery email").isVisible())
         ) {
-          this.sendMessage("progress", `Handling recovery email confirmation for ${email}`);
-          await page.click('text=Confirm your recovery email');
+          this.sendMessage(
+            "progress",
+            `Handling recovery email confirmation for ${email}`,
+          );
+          await page.click("text=Confirm your recovery email");
           await this.delay(5000);
 
-          this.sendMessage("progress", `Entering recovery email for ${secretKey}`);
+          this.sendMessage(
+            "progress",
+            `Entering recovery email for ${secretKey}`,
+          );
           // name="knowledgePreregisteredEmailResponse"
-          await page.fill('input[name="knowledgePreregisteredEmailResponse"], input[type="email"]', secretKey);
+          await page.fill(
+            'input[name="knowledgePreregisteredEmailResponse"], input[type="email"]',
+            secretKey,
+          );
           await this.delay(1000);
-          await page.click('button:has-text("Next"), button[type="submit"]');
+          await page.click('button:has-text("/Next|Tiếp tục/"), button[type="submit"]');
           await this.delay(5000);
         } else {
-          this.sendMessage("progress", `No recovery email confirmation required for ${email}`);
+          this.sendMessage(
+            "progress",
+            `No recovery email confirmation required for ${email}`,
+          );
         }
       } catch (error) {
-        this.sendMessage("warn", `Error handling recovery email confirmation for ${email}: ${error.message}`);
+        this.sendMessage(
+          "warn",
+          `Error handling recovery email confirmation for ${email}: ${error.message}`,
+        );
       }
 
       // Handle "Not now" or "Skip" buttons
@@ -464,9 +494,9 @@ function isValidEmail_(email) {
         // Array.from(document.querySelectorAll("button")).map(item => item.innerText);
         await page.evaluate(() => {
           const buttons = Array.from(document.querySelectorAll("button"));
-          const targetButton = buttons.find(button => {
+          const targetButton = buttons.find((button) => {
             const text = button.innerText.toLowerCase();
-            return text.includes("not now") || text.includes("skip");
+            return text.includes("not now") || text.includes("skip") || text.includes("bỏ qua") || text.includes("để sau");
           });
           if (targetButton) {
             targetButton.click();
@@ -477,20 +507,51 @@ function isValidEmail_(email) {
 
         if (
           await page
-            .locator('button:has-text("Not now"), button:has-text("Skip")')
+            .locator('button:has-text("/Not now|Bỏ qua/"), button:has-text("/Skip|Tiếp tục/")')
             .isVisible()
         ) {
           await page
-            .locator('button:has-text("Not now"), button:has-text("Skip")')
+            .locator('button:has-text("/Not now|Bỏ qua/"), button:has-text("/Skip|Tiếp tục/")')
             .click();
           await this.delay(2000);
-          this.sendMessage("progress", "Đã bấm not now")
+          this.sendMessage("progress", "Đã bấm not now");
         } else {
-          this.sendMessage("progress", `Không tìm thấy nút not now hoặc skip cho ${email}, tiếp tục...`);
+          this.sendMessage(
+            "progress",
+            `Không tìm thấy nút not now hoặc skip cho ${email}, tiếp tục...`,
+          );
         }
       } catch (error) {
         // Ignore if not found
-        this.sendMessage("error", `Không tìm thấy nút not now hoặc skip cho ${email}, tiếp tục... ${error.message}`);
+        this.sendMessage(
+          "error",
+          `Không tìm thấy nút not now hoặc skip cho ${email}, tiếp tục... ${error.message}`,
+        );
+      }
+
+      try {
+        // Click button "Hủy"
+        await page.evaluate(() => {
+          const cancelButton = Array.from(
+            document.querySelectorAll("div span"),
+          ).find((item) => item.innerText.toLowerCase() === "huỷ");
+          if (cancelButton) {
+            cancelButton.click();
+          }
+
+          const skipButton = Array.from(
+            document.querySelectorAll("div span"),
+          ).find((item) => item.innerText.toLowerCase() === "bỏ qua");
+          if (skipButton) {
+            skipButton.click();
+          }
+        });
+      } catch (error) {
+        // Ignore if not found
+        this.sendMessage(
+          "progress",
+          `Không tìm thấy nút Hủy cho ${email}, tiếp tục...`,
+        );
       }
 
       this.sendMessage("progress", `Creating new Google Sheet for ${email}`);
@@ -510,7 +571,10 @@ function isValidEmail_(email) {
 
       //  Check url is Login
       if (page.url().includes("signin")) {
-        this.sendMessage("error", `Tài khoản ${email} chưa đăng nhập thành công`);
+        this.sendMessage(
+          "error",
+          `Tài khoản ${email} chưa đăng nhập thành công`,
+        );
         return;
       }
       // Navigate to specific spreadsheet (if needed)
@@ -522,11 +586,14 @@ function isValidEmail_(email) {
       var res = await page.evaluate(async () => {
         let attempts = 0;
         let maxAttempts = 5;
-        while (!document.querySelector("#docs-extensions-menu") && attempts < maxAttempts) {
+        while (
+          !document.querySelector("#docs-extensions-menu") &&
+          attempts < maxAttempts
+        ) {
           // Wait until the menu is available
           console.log("Waiting menu...");
           attempts++;
-          await new Promise(res => setTimeout(res, 5000));
+          await new Promise((res) => setTimeout(res, 5000));
         }
         if (attempts === maxAttempts) {
           return false;
@@ -536,7 +603,7 @@ function isValidEmail_(email) {
         el_test.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
         el_test.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
         el_test.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-        await new Promise(res => setTimeout(res, 2000));
+        await new Promise((res) => setTimeout(res, 2000));
 
         const el = document.querySelector("#docs-extensions-menu");
         el.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
@@ -574,7 +641,12 @@ function isValidEmail_(email) {
       await this.executeFunction(newPage, fillDataFunc);
       this.sendMessage("progress", `Fill data function executed for ${email}`);
       await this.delay(5000);
-      await this.handlePermissionAuthorization(browser, newPage, secretKey, true);
+      await this.handlePermissionAuthorization(
+        browser,
+        newPage,
+        secretKey,
+        true,
+      );
       await this.delay(5000);
 
       // Execute send emails function
@@ -584,7 +656,12 @@ function isValidEmail_(email) {
         `Send emails function executed for ${email}`,
       );
       await this.delay(5000);
-      await this.handlePermissionAuthorization(browser, newPage, secretKey, true);
+      await this.handlePermissionAuthorization(
+        browser,
+        newPage,
+        secretKey,
+        true,
+      );
 
       // Monitor execution and re-run if needed
       const monitorResult = await this.monitorExecution(newPage);
@@ -596,12 +673,20 @@ function isValidEmail_(email) {
         throw interruptionError;
       }
 
-      this.sendMessage("success", `Account ${email} processed successfully`, null, null, { email: email, password: account.password });
+      this.sendMessage(
+        "success",
+        `Account ${email} processed successfully`,
+        null,
+        null,
+        { email: email, password: account.password },
+      );
 
       return { success: true, account: email };
     } catch (error) {
       const manualClose = this.isManualCloseError(error) || !!error.manualClose;
-      const reusableData = manualClose ? this.getAccountReusableData(account) : null;
+      const reusableData = manualClose
+        ? this.getAccountReusableData(account)
+        : null;
 
       this.sendMessage(
         "error",
@@ -611,7 +696,7 @@ function isValidEmail_(email) {
           reusableData,
         },
         null,
-        { email: email, password: account.password }
+        { email: email, password: account.password },
       );
 
       if (manualClose && reusableData) {
@@ -636,7 +721,10 @@ function isValidEmail_(email) {
         try {
           await browser.close();
         } catch (closeError) {
-          this.sendMessage("error", `Error closing browser: ${closeError.message}`);
+          this.sendMessage(
+            "error",
+            `Error closing browser: ${closeError.message}`,
+          );
         }
       }
 
@@ -681,11 +769,18 @@ function isValidEmail_(email) {
   }
 
   // Handle permission authorization
-  async handlePermissionAuthorization(browser, newPage, secretKey, recheck = false) {
+  async handlePermissionAuthorization(
+    browser,
+    newPage,
+    secretKey,
+    recheck = false,
+  ) {
     try {
       await this.delay(10000);
       try {
-        await newPage.click('text=Review Permissions', { timeout: 15000 });
+        await newPage.click("text=/Review Permissions|Xem lại quyền", {
+          timeout: 15000,
+        });
         console.log("Clicked Review Permissions button");
       } catch {
         await newPage.evaluate(async () => {
@@ -693,20 +788,31 @@ function isValidEmail_(email) {
           const maxAttempts = 10;
 
           const checkDialog = () => {
-            console.log("Checking for dialog...", document.querySelectorAll("[role='dialog']"));
+            console.log(
+              "Checking for dialog...",
+              document.querySelectorAll("[role='dialog']"),
+            );
             return document.querySelector("[role='dialog']") !== null;
-          }
+          };
           while (attempts < maxAttempts) {
             if (checkDialog()) {
               console.log("Found!");
               break;
             }
-            await new Promise(res => setTimeout(res, Math.random() * 3000 + 2000));
+            await new Promise((res) =>
+              setTimeout(res, Math.random() * 3000 + 2000),
+            );
             attempts++;
           }
-          await new Promise(res => setTimeout(res, 5000));
-          const buttonSelectorList = ["[role='dialog'] button:nth-child(2)", "button:has-text('Allow')", "button:has-text('Continue')"];
-          const btn = buttonSelectorList.map(selector => document.querySelector(selector)).find(el => el);
+          await new Promise((res) => setTimeout(res, 5000));
+          const buttonSelectorList = [
+            "[role='dialog'] button:nth-child(2)",
+            "button:has-text('/Allow|Cho phép/')",
+            "button:has-text('/Continue|Tiếp tục/')",
+          ];
+          const btn = buttonSelectorList
+            .map((selector) => document.querySelector(selector))
+            .find((el) => el);
           if (!btn) {
             console.log("No button found to click in permission dialog");
             return;
@@ -741,23 +847,25 @@ function isValidEmail_(email) {
 
       // Click "Advanced"
       await reviewPermissionsPage
-        .locator('a:has-text("Advanced")')
+        .locator('a:has-text("/Advanced|Nâng cao/")')
         .click({ timeout: 10000 });
 
       // Click "Go to Untitled project (unsafe)"
       await reviewPermissionsPage
-        .locator("text=Go to Untitled project (unsafe)")
+        .locator(
+          "text=/Go to Untitled project \\(unsafe\\)|Đi tới Dự án không có tiêu đề \\(không an toàn\\)/",
+        )
         .click({ timeout: 10000 });
 
       // Click "Continue"
       await reviewPermissionsPage
-        .locator('button:has-text("Continue")')
+        .locator("button:has-text(/Continue|Tiếp tục/)")
         .click({ timeout: 10000 });
 
       // Select all permissions
       try {
         await reviewPermissionsPage
-          .locator("text=Select all")
+          .locator("text=/Select all|Chọn tất cả/")
           .click({ timeout: 10000 });
       } catch (error) {
         await reviewPermissionsPage.evaluate(() => {
@@ -774,11 +882,11 @@ function isValidEmail_(email) {
 
       // Click Continue again
       await reviewPermissionsPage
-        .locator('button:has-text("Continue")')
+        .locator('button:has-text("/Continue|Tiếp tục/")')
         .click({ timeout: 10000 });
 
       // Wait for execution completed
-      await newPage.waitForSelector('div:has-text("Execution completed")', {
+      await newPage.waitForSelector('div:has-text("/Execution completed|Đã hoàn tất quá trình thực thi/")', {
         timeout: 60000,
       });
     } catch (error) {
@@ -808,8 +916,12 @@ function isValidEmail_(email) {
               const lastItem = itemList[itemList.length - 1];
               const texts = lastItem.querySelectorAll("div");
 
-              const errorDiv = Array.from(texts).find((div) =>
-                div.textContent.includes("Exceeded maximum execution time") || div.textContent.includes("too many times"),
+              const errorDiv = Array.from(texts).find(
+                (div) =>
+                  div.textContent.includes("Exceeded maximum execution time") ||
+                  div.textContent.includes("too many times") ||
+                  div.textContent.includes("quá nhiều lần") ||
+                  div.textContent.includes("vượt quá thời gian thực thi tối đa"),
               );
 
               if (errorDiv) {
@@ -817,7 +929,8 @@ function isValidEmail_(email) {
               }
 
               const success = Array.from(texts).find((div) =>
-                div.textContent.includes("Execution completed"),
+                div.textContent.includes("Execution completed") ||
+                div.textContent.includes("Đã hoàn tất quá trình thực thi")
               );
 
               if (success) {
@@ -869,15 +982,13 @@ function isValidEmail_(email) {
           if (this.isManualCloseError(error)) {
             resolve({
               interrupted: true,
-              message: "Tab/browser was closed manually during script execution",
+              message:
+                "Tab/browser was closed manually during script execution",
             });
             return;
           }
 
-          this.sendMessage(
-            "warn",
-            `Monitor execution error: ${error.message}`,
-          );
+          this.sendMessage("warn", `Monitor execution error: ${error.message}`);
           attempts++;
           setTimeout(checkExecution, 3000);
         }
@@ -956,11 +1067,14 @@ function isValidEmail_(email) {
     this.sendMessage("progress", "Worker stopping...");
 
     if (this.browser) {
-      this.browser.close().then(() => {
-        this.sendMessage("progress", "Browser closed successfully");
-      }).catch((error) => {
-        this.sendMessage("error", `Error closing browser: ${error.message}`);
-      });
+      this.browser
+        .close()
+        .then(() => {
+          this.sendMessage("progress", "Browser closed successfully");
+        })
+        .catch((error) => {
+          this.sendMessage("error", `Error closing browser: ${error.message}`);
+        });
     }
 
     // Force exit after a timeout
