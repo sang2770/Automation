@@ -25,10 +25,14 @@ const pathG2Input2 = document.getElementById('path-g2-input2');
 const btnG2Input3 = document.getElementById('btn-g2-input3');
 const pathG2Input3 = document.getElementById('path-g2-input3');
 
+const btnG2Input4 = document.getElementById('btn-g2-input4');
+const pathG2Input4 = document.getElementById('path-g2-input4');
+
 const btnOutput = document.getElementById('btn-output');
 const pathOutput = document.getElementById('path-output');
 
 const runCountInput = document.getElementById('run-count');
+const repeatCountInput = document.getElementById('repeat-count');
 
 const btnProcess = document.getElementById('btn-process');
 const logContent = document.getElementById('log-content');
@@ -48,6 +52,7 @@ let paths = {
     g2input1: null,
     g2input2: null,
     g2input3: null,
+    g2input4: null,
     output: null
 };
 
@@ -72,6 +77,7 @@ btnInput4.addEventListener('click', () => selectFolder('input4', pathInput4));
 btnG2Input1.addEventListener('click', () => selectFolder('g2input1', pathG2Input1));
 btnG2Input2.addEventListener('click', () => selectFolder('g2input2', pathG2Input2));
 btnG2Input3.addEventListener('click', () => selectFolder('g2input3', pathG2Input3));
+btnG2Input4.addEventListener('click', () => selectFolder('g2input4', pathG2Input4));
 btnOutput.addEventListener('click', () => selectFolder('output', pathOutput));
 
 btnProcess.addEventListener('click', async () => {
@@ -90,6 +96,7 @@ btnProcess.addEventListener('click', async () => {
     if (!paths.g2input1) missing.push("G2 - Đầu vào 1");
     if (!paths.g2input2) missing.push("G2 - Đầu vào 2");
     if (!paths.g2input3) missing.push("G2 - Đầu vào 3");
+    if (!paths.g2input4) missing.push("G2 - Đầu vào 4");
     if (!paths.output) missing.push("Đầu ra");
 
     if (missing.length > 0) {
@@ -98,6 +105,7 @@ btnProcess.addEventListener('click', async () => {
     }
 
     const runCount = parseInt(runCountInput.value) || 1;
+    const repeatCount = parseInt(repeatCountInput.value) || 1;
 
     const config = {
         input1: { path: paths.input1, count: parseInt(countInput1.value) || 1 },
@@ -108,14 +116,16 @@ btnProcess.addEventListener('click', async () => {
         group2input1: { path: paths.g2input1 },
         group2input2: { path: paths.g2input2 },
         group2input3: { path: paths.g2input3 },
+        group2input4: { path: paths.g2input4 },
         output: paths.output,
-        runCount: runCount
+        runCount: runCount,
+        repeatCount: repeatCount
     };
 
     btnProcess.disabled = true;
     btnProcess.textContent = 'Đang xử lý...';
 
-    log(`Bắt đầu xử lý ${runCount} lần (Chế độ Không Lặp)...`, 'info');
+    log(`Bắt đầu xử lý ${runCount} lần (Lặp lại Input 1+2+3 ${repeatCount} lần)...`, 'info');
     try {
         await window.electronAPI.processAudio(config);
     } catch (err) {
@@ -211,8 +221,10 @@ function getSettings() {
         g2input1: { path: paths.g2input1 },
         g2input2: { path: paths.g2input2 },
         g2input3: { path: paths.g2input3 },
+        g2input4: { path: paths.g2input4 },
         output: paths.output,
-        runCount: runCountInput.value
+        runCount: runCountInput.value,
+        repeatCount: repeatCountInput.value
     };
 }
 
@@ -273,10 +285,24 @@ async function loadSettings() {
         pathG2Input3.title = paths.g2input3 || '';
     }
 
+    if (settings.g2input4) {
+        paths.g2input4 = settings.g2input4.path;
+        pathG2Input4.textContent = paths.g2input4 || 'Chưa chọn thư mục...';
+        pathG2Input4.title = paths.g2input4 || '';
+    }
+
     if (settings.output) {
         paths.output = settings.output;
         pathOutput.textContent = paths.output || 'Chưa chọn thư mục...';
         pathOutput.title = paths.output || '';
+    }
+
+    if (settings.runCount) {
+        runCountInput.value = settings.runCount || 1;
+    }
+
+    if (settings.repeatCount) {
+        repeatCountInput.value = settings.repeatCount || 1;
     }
 
     log('Đã tải cấu hình lưu trước đó.', 'success');
@@ -285,7 +311,7 @@ async function loadSettings() {
 // Attach Save Listeners
 const inputsToWatch = [
     countInput1, countInput2, countInput3, countInput4,
-    runCountInput
+    runCountInput, repeatCountInput
 ];
 
 inputsToWatch.forEach(el => {
