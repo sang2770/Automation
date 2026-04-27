@@ -10,10 +10,6 @@ const btnInput3 = document.getElementById('btn-input3');
 const pathInput3 = document.getElementById('path-input3');
 const countInput3 = document.getElementById('count-input3');
 
-const btnInput4 = document.getElementById('btn-input4');
-const pathInput4 = document.getElementById('path-input4');
-const countInput4 = document.getElementById('count-input4');
-
 
 
 const btnG2Input1 = document.getElementById('btn-g2-input1');
@@ -24,9 +20,6 @@ const pathG2Input2 = document.getElementById('path-g2-input2');
 
 const btnG2Input3 = document.getElementById('btn-g2-input3');
 const pathG2Input3 = document.getElementById('path-g2-input3');
-
-const btnG2Input4 = document.getElementById('btn-g2-input4');
-const pathG2Input4 = document.getElementById('path-g2-input4');
 
 const btnOutput = document.getElementById('btn-output');
 const pathOutput = document.getElementById('path-output');
@@ -47,12 +40,10 @@ let paths = {
     input1: null,
     input2: null,
     input3: null,
-    input4: null,
 
     g2input1: null,
     g2input2: null,
     g2input3: null,
-    g2input4: null,
     output: null
 };
 
@@ -72,12 +63,10 @@ function log(msg, type = 'info') {
 btnInput1.addEventListener('click', () => selectFolder('input1', pathInput1));
 btnInput2.addEventListener('click', () => selectFolder('input2', pathInput2));
 btnInput3.addEventListener('click', () => selectFolder('input3', pathInput3));
-btnInput4.addEventListener('click', () => selectFolder('input4', pathInput4));
 
 btnG2Input1.addEventListener('click', () => selectFolder('g2input1', pathG2Input1));
 btnG2Input2.addEventListener('click', () => selectFolder('g2input2', pathG2Input2));
 btnG2Input3.addEventListener('click', () => selectFolder('g2input3', pathG2Input3));
-btnG2Input4.addEventListener('click', () => selectFolder('g2input4', pathG2Input4));
 btnOutput.addEventListener('click', () => selectFolder('output', pathOutput));
 
 btnProcess.addEventListener('click', async () => {
@@ -91,12 +80,10 @@ btnProcess.addEventListener('click', async () => {
     if (!paths.input1) missing.push("Đầu vào 1");
     if (!paths.input2) missing.push("Đầu vào 2");
     if (!paths.input3) missing.push("Đầu vào 3");
-    if (!paths.input4) missing.push("Đầu vào 4");
 
     if (!paths.g2input1) missing.push("G2 - Đầu vào 1");
     if (!paths.g2input2) missing.push("G2 - Đầu vào 2");
     if (!paths.g2input3) missing.push("G2 - Đầu vào 3");
-    if (!paths.g2input4) missing.push("G2 - Đầu vào 4");
     if (!paths.output) missing.push("Đầu ra");
 
     if (missing.length > 0) {
@@ -111,12 +98,10 @@ btnProcess.addEventListener('click', async () => {
         input1: { path: paths.input1, count: parseInt(countInput1.value) || 1 },
         input2: { path: paths.input2, count: parseInt(countInput2.value) || 1 },
         input3: { path: paths.input3, count: parseInt(countInput3.value) || 1 },
-        input4: { path: paths.input4, count: parseInt(countInput4.value) || 1 },
 
         group2input1: { path: paths.g2input1 },
         group2input2: { path: paths.g2input2 },
         group2input3: { path: paths.g2input3 },
-        group2input4: { path: paths.g2input4 },
         output: paths.output,
         runCount: runCount,
         repeatCount: repeatCount
@@ -216,12 +201,10 @@ function getSettings() {
         input1: { path: paths.input1, count: countInput1.value },
         input2: { path: paths.input2, count: countInput2.value },
         input3: { path: paths.input3, count: countInput3.value },
-        input4: { path: paths.input4, count: countInput4.value },
 
         g2input1: { path: paths.g2input1 },
         g2input2: { path: paths.g2input2 },
         g2input3: { path: paths.g2input3 },
-        g2input4: { path: paths.g2input4 },
         output: paths.output,
         runCount: runCountInput.value,
         repeatCount: repeatCountInput.value
@@ -258,13 +241,6 @@ async function loadSettings() {
         countInput3.value = settings.input3.count || 1;
     }
 
-    if (settings.input4) {
-        paths.input4 = settings.input4.path;
-        pathInput4.textContent = paths.input4 || 'Chưa chọn thư mục...';
-        pathInput4.title = paths.input4 || '';
-        countInput4.value = settings.input4.count || 1;
-    }
-
 
 
     if (settings.g2input1) {
@@ -283,12 +259,6 @@ async function loadSettings() {
         paths.g2input3 = settings.g2input3.path;
         pathG2Input3.textContent = paths.g2input3 || 'Chưa chọn thư mục...';
         pathG2Input3.title = paths.g2input3 || '';
-    }
-
-    if (settings.g2input4) {
-        paths.g2input4 = settings.g2input4.path;
-        pathG2Input4.textContent = paths.g2input4 || 'Chưa chọn thư mục...';
-        pathG2Input4.title = paths.g2input4 || '';
     }
 
     if (settings.output) {
@@ -310,7 +280,7 @@ async function loadSettings() {
 
 // Attach Save Listeners
 const inputsToWatch = [
-    countInput1, countInput2, countInput3, countInput4,
+    countInput1, countInput2, countInput3,
     runCountInput, repeatCountInput
 ];
 

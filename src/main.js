@@ -164,11 +164,9 @@ ipcMain.handle("process:start", async (event, config) => {
     input1,
     input2,
     input3,
-    input4,
     group2input1,
     group2input2,
     group2input3,
-    group2input4,
     output,
     runCount = 1,
     repeatCount = 1,
@@ -202,9 +200,8 @@ ipcMain.handle("process:start", async (event, config) => {
     const files1 = getRandomFiles(input1.path, input1.count);
     const files2 = getRandomFiles(input2.path, input2.count);
     const files3 = getRandomFiles(input3.path, input3.count);
-    const files4 = getRandomFiles(input4.path, input4.count);
 
-    if (files1.length === 0 && files2.length === 0 && files3.length === 0 && files4.length === 0)
+    if (files1.length === 0 && files2.length === 0 && files3.length === 0)
       throw new Error("Không tìm thấy file trong các thư mục Input.");
 
     // Lặp lại (Input 1 + 2 + 3) repeatCount lần
@@ -223,14 +220,6 @@ ipcMain.handle("process:start", async (event, config) => {
           currentDuration += await getDuration(file);
         }
       }
-    }
-
-    // Thêm Input 4 (không lặp lại)
-    for (const file of files4) {
-      mainList.push(file);
-      originalFilesList.push(file);
-      group2SourceFiles.push({ path: file, group: 4 });
-      currentDuration += await getDuration(file);
     }
 
     // ==============================
@@ -281,7 +270,6 @@ ipcMain.handle("process:start", async (event, config) => {
       if (groupIdx === 1) g2Dir = group2input1.path;
       else if (groupIdx === 2) g2Dir = group2input2.path;
       else if (groupIdx === 3) g2Dir = group2input3.path;
-      else if (groupIdx === 4) g2Dir = group2input4.path;
 
       if (!g2Dir)
         throw new Error(`Không thể xác định thư mục Group 2 cho file: ${fileName} (Nhóm ${groupIdx})`);
@@ -441,8 +429,7 @@ ipcMain.handle("process:start", async (event, config) => {
     if (
       !fs.existsSync(input1.path) ||
       !fs.existsSync(input2.path) ||
-      !fs.existsSync(input3.path) ||
-      !fs.existsSync(input4.path)
+      !fs.existsSync(input3.path)
     ) {
       throw new Error("Một hoặc nhiều thư mục đầu vào Group 1 không tồn tại.");
     }
@@ -450,14 +437,13 @@ ipcMain.handle("process:start", async (event, config) => {
     if (
       !fs.existsSync(group2input1.path) ||
       !fs.existsSync(group2input2.path) ||
-      !fs.existsSync(group2input3.path) ||
-      !fs.existsSync(group2input4.path)
+      !fs.existsSync(group2input3.path)
     ) {
       throw new Error("Một hoặc nhiều thư mục đầu vào Group 2 không tồn tại.");
     }
 
     const maxConcurrency = 5; // Giới hạn số luồng FFmpeg chạy song song
-    log(`Bắt đầu xử lý ${runCount} lần (lặp lại Input 1+2+3 ${repeatCount} lần, Input 4 không lặp)...`);
+    log(`Bắt đầu xử lý ${runCount} lần (lặp lại Input 1+2+3 ${repeatCount} lần)...`);
 
     const executing = new Set();
     const promises = [];
