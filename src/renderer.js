@@ -110,7 +110,7 @@ btnProcess.addEventListener('click', async () => {
     btnProcess.disabled = true;
     btnProcess.textContent = 'Đang xử lý...';
 
-    log(`Bắt đầu xử lý ${runCount} lần (Lặp lại Input 1+2+3 ${repeatCount} lần)...`, 'info');
+    log(`Bắt đầu xử lý ${runCount} lần (Lặp lại Input 1+2 ${repeatCount} lần)...`, 'info');
     try {
         await window.electronAPI.processAudio(config);
     } catch (err) {

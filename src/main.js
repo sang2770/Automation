@@ -191,7 +191,7 @@ ipcMain.handle("process:start", async (event, config) => {
     const group2SourceFiles = []; // Track only files that Group 2 should mirror
 
     // ==============================
-    // 2️⃣ BUILD MAIN LIST (1+2+3) * repeatCount + 4
+    // 2️⃣ BUILD MAIN LIST (1+2) * repeatCount + 3
     // ==============================
 
     let mainList = [];
@@ -204,12 +204,11 @@ ipcMain.handle("process:start", async (event, config) => {
     if (files1.length === 0 && files2.length === 0 && files3.length === 0)
       throw new Error("Không tìm thấy file trong các thư mục Input.");
 
-    // Lặp lại (Input 1 + 2 + 3) repeatCount lần
+    // Lặp lại (Input 1 + 2) repeatCount lần
     for (let rep = 0; rep < repeatCount; rep++) {
       const allFilesForRepeat = [
         { files: files1, group: 1 },
         { files: files2, group: 2 },
-        { files: files3, group: 3 },
       ];
 
       for (const item of allFilesForRepeat) {
@@ -220,6 +219,14 @@ ipcMain.handle("process:start", async (event, config) => {
           currentDuration += await getDuration(file);
         }
       }
+    }
+
+    // Thêm Input 3 một lần duy nhất vào cuối
+    for (const file of files3) {
+      mainList.push(file);
+      originalFilesList.push(file);
+      group2SourceFiles.push({ path: file, group: 3 });
+      currentDuration += await getDuration(file);
     }
 
     // ==============================
@@ -443,7 +450,7 @@ ipcMain.handle("process:start", async (event, config) => {
     }
 
     const maxConcurrency = 5; // Giới hạn số luồng FFmpeg chạy song song
-    log(`Bắt đầu xử lý ${runCount} lần (lặp lại Input 1+2+3 ${repeatCount} lần)...`);
+    log(`Bắt đầu xử lý ${runCount} lần (lặp lại Input 1+2 ${repeatCount} lần)...`);
 
     const executing = new Set();
     const promises = [];
