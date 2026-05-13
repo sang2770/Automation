@@ -626,6 +626,22 @@ function isValidEmail_(email) {
       await newPage.waitForLoadState();
       await this.delay(5000);
 
+      try {
+        // Check "Something went wrong" error
+        const errorVisible = await newPage.locator("text=/Something went wrong|Đã xảy ra lỗi/").isVisible({
+          timeout: 10000,
+        });
+        if (errorVisible) {
+          // Click button role="button" Reload or RELOAD
+          await newPage.click('button:has-text("/Reload|Tải lại/")', {
+            timeout: 10000,
+          });
+          await newPage.waitForLoadState();
+          await this.delay(5000);
+        }
+      } catch (error) {
+
+      }
       // Execute functions in Apps Script
       await this.executeFunction(newPage, this.getPermissionRequiredFunction());
       this.sendMessage("progress", `Permission function executed for ${email}`);
