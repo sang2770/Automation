@@ -474,7 +474,9 @@ function isValidEmail_(email) {
             secretKey,
           );
           await this.delay(1000);
-          await page.click('button:has-text("/Next|Tiếp tục/"), button[type="submit"]');
+          await page.click(
+            'button:has-text("/Next|Tiếp tục/"), button[type="submit"]',
+          );
           await this.delay(5000);
         } else {
           this.sendMessage(
@@ -496,7 +498,12 @@ function isValidEmail_(email) {
           const buttons = Array.from(document.querySelectorAll("button"));
           const targetButton = buttons.find((button) => {
             const text = button.innerText.toLowerCase();
-            return text.includes("not now") || text.includes("skip") || text.includes("bỏ qua") || text.includes("để sau");
+            return (
+              text.includes("not now") ||
+              text.includes("skip") ||
+              text.includes("bỏ qua") ||
+              text.includes("để sau")
+            );
           });
           if (targetButton) {
             targetButton.click();
@@ -507,11 +514,15 @@ function isValidEmail_(email) {
 
         if (
           await page
-            .locator('button:has-text("/Not now|Bỏ qua/"), button:has-text("/Skip|Tiếp tục/")')
+            .locator(
+              'button:has-text("/Not now|Bỏ qua/"), button:has-text("/Skip|Tiếp tục/")',
+            )
             .isVisible()
         ) {
           await page
-            .locator('button:has-text("/Not now|Bỏ qua/"), button:has-text("/Skip|Tiếp tục/")')
+            .locator(
+              'button:has-text("/Not now|Bỏ qua/"), button:has-text("/Skip|Tiếp tục/")',
+            )
             .click();
           await this.delay(2000);
           this.sendMessage("progress", "Đã bấm not now");
@@ -628,19 +639,25 @@ function isValidEmail_(email) {
 
       try {
         // Check "Something went wrong" error
-        const errorVisible = await newPage.locator("text=/Something went wrong|Đã xảy ra lỗi/").isVisible({
-          timeout: 10000,
-        });
-        if (errorVisible) {
-          // Click button role="button" Reload or RELOAD
-          await newPage.click('button:has-text("/Reload|Tải lại/")', {
-            timeout: 10000,
-          });
-          await newPage.waitForLoadState();
+
+        const errorLocator = newPage
+          .locator(
+            'div:has-text("Failed to create a script for user"), ' +
+              'div:has-text("Something went wrong"), ' +
+              'div:has-text("Đã xảy ra lỗi")',
+          )
+          .first();
+
+        if (await errorLocator.isVisible({ timeout: 10000 })) {
           await this.delay(5000);
+          console.log("Detected 'Something went wrong' error, refreshing page...");
+          await newPage.reload();
         }
       } catch (error) {
-
+        console.log(
+          "No 'Something went wrong' error detected, continuing...",
+          error.message,
+        );
       }
       // Execute functions in Apps Script
       await this.executeFunction(newPage, this.getPermissionRequiredFunction());
@@ -902,9 +919,12 @@ function isValidEmail_(email) {
         .click({ timeout: 10000 });
 
       // Wait for execution completed
-      await newPage.waitForSelector('div:has-text("/Execution completed|Đã hoàn tất quá trình thực thi/")', {
-        timeout: 60000,
-      });
+      await newPage.waitForSelector(
+        'div:has-text("/Execution completed|Đã hoàn tất quá trình thực thi/")',
+        {
+          timeout: 60000,
+        },
+      );
     } catch (error) {
       this.sendMessage(
         "info",
@@ -937,16 +957,19 @@ function isValidEmail_(email) {
                   div.textContent.includes("Exceeded maximum execution time") ||
                   div.textContent.includes("too many times") ||
                   div.textContent.includes("quá nhiều lần") ||
-                  div.textContent.includes("vượt quá thời gian thực thi tối đa"),
+                  div.textContent.includes(
+                    "vượt quá thời gian thực thi tối đa",
+                  ),
               );
 
               if (errorDiv) {
                 return { timeout: true };
               }
 
-              const success = Array.from(texts).find((div) =>
-                div.textContent.includes("Execution completed") ||
-                div.textContent.includes("Đã hoàn tất quá trình thực thi")
+              const success = Array.from(texts).find(
+                (div) =>
+                  div.textContent.includes("Execution completed") ||
+                  div.textContent.includes("Đã hoàn tất quá trình thực thi"),
               );
 
               if (success) {
