@@ -907,7 +907,7 @@ function isValidEmail_(email) {
         console.log("No Review Permissions button, checking for dialog...");
         await newPage.evaluate(async () => {
           let attempts = 0;
-          const maxAttempts = 10;
+          const maxAttempts = 5;
 
           const checkDialog = () => {
             console.log(
@@ -956,33 +956,70 @@ function isValidEmail_(email) {
           'input[type="tel"], input[aria-label*="code"]',
           otpCode,
         );
-        await this.delay(1000);
+        await this.delay(2000);
         await reviewPermissionsPage.click('#totpNext, button[type="submit"]');
+        await this.delay(5000);
       } catch (error) {
         // OTP might not be required
       }
 
       // Click "Advanced"
-      await reviewPermissionsPage
-        .locator('a:has-text("/Advanced|Nâng cao/")')
-        .click({ timeout: 10000 });
+      try {
+        await reviewPermissionsPage
+          .locator('a:has-text("Advanced")')
+          .click({ timeout: 10000 });
+      } catch {
+        // document.querySelectorAll("a")
+        await reviewPermissionsPage.evaluate(() => {
+          const links = document.querySelectorAll("a");
+          const advancedLink = Array.from(links).find((link) =>
+            link.textContent.trim().toLocaleLowerCase().includes("advanced")
+          );
+          advancedLink.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+          advancedLink.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+          advancedLink.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        });
+      }
+
 
       // Click "Go to Untitled project (unsafe)"
-      await reviewPermissionsPage
-        .locator(
-          "text=/Go to Untitled project \\(unsafe\\)/",
-        )
-        .click({ timeout: 10000 });
+      try {
+        await reviewPermissionsPage
+          .locator('a:has-text("Go to Untitled project (unsafe)")')
+          .click({ timeout: 10000 });
+      } catch {
+        await reviewPermissionsPage.evaluate(() => {
+          const links = document.querySelectorAll("a");
+          const advancedLink = Array.from(links).find((link) =>
+            link.textContent.trim().toLocaleLowerCase().includes("go to untitled project (unsafe)")
+          );
+          advancedLink.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+          advancedLink.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+          advancedLink.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        });
+      }
 
       // Click "Continue"
-      await reviewPermissionsPage
-        .locator("button:has-text(/Continue/)")
-        .click({ timeout: 10000 });
+      try {
+        await reviewPermissionsPage
+          .locator("button:has-text('Continue')")
+          .click({ timeout: 10000 });
+      } catch {
+        await reviewPermissionsPage.evaluate(() => {
+          const buttons = document.querySelectorAll("button");
+          const continueButton = Array.from(buttons).find((button) =>
+            button.textContent.trim().toLocaleLowerCase().includes("continue")
+          );
+          continueButton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+          continueButton.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+          continueButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        });
+      }
 
       // Select all permissions
       try {
         await reviewPermissionsPage
-          .locator("text=/Select all/")
+          .locator('text="Select all"')
           .click({ timeout: 10000 });
       } catch (error) {
         await reviewPermissionsPage.evaluate(() => {
@@ -998,13 +1035,25 @@ function isValidEmail_(email) {
       }
 
       // Click Continue again
-      await reviewPermissionsPage
-        .locator('button:has-text("/Continue/")')
-        .click({ timeout: 10000 });
+      try {
+        await reviewPermissionsPage
+          .locator('button:has-text("Continue")')
+          .click({ timeout: 10000 });
+      } catch {
+        await reviewPermissionsPage.evaluate(() => {
+          const buttons = document.querySelectorAll("button");
+          const continueButton = Array.from(buttons).find((button) =>
+            button.textContent.trim().toLocaleLowerCase().includes("continue")
+          );
+          continueButton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+          continueButton.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+          continueButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        });
+      }
 
       // Wait for execution completed
       await newPage.waitForSelector(
-        'div:has-text("/Execution completed/")',
+        'div:has-text("Execution completed")',
         {
           timeout: 60000,
         },
