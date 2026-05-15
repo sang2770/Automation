@@ -513,22 +513,47 @@ function isValidEmail_(email) {
         if (
           await page
             .locator(
-              'button:has-text("/Not now|Bỏ qua/"), button:has-text("/Skip|Tiếp tục/")',
+              'button:has-text("Not now"), button:has-text("Skip")',
             )
             .isVisible()
         ) {
           await page
             .locator(
-              'button:has-text("/Not now/"), button:has-text("/Skip/")',
+              'button:has-text("Not now"), button:has-text("Skip")',
             )
             .click();
           await this.delay(2000);
           this.sendMessage("progress", "Đã bấm not now");
         } else {
-          this.sendMessage(
-            "progress",
-            `Không tìm thấy nút not now hoặc skip cho ${email}, tiếp tục...`,
-          );
+          let isClicked
+          try {
+            // Array.from(document.querySelectorAll("button")).find(item => item.innerText === "Not now").click()
+            isClicked = await page.evaluate(() => {
+              const buttons = Array.from(document.querySelectorAll("button"));
+              const targetButton = buttons.find((button) => {
+                const text = button.innerText.toLowerCase();
+                return (
+                  text.includes("not now") ||
+                  text.includes("skip")
+                );
+              });
+              if (targetButton) {
+                targetButton.click();
+                return true;
+              }
+              return false;
+            });
+          } catch (error) {
+            console.log("Error: " + error.message);
+          }
+          if (isClicked) {
+            this.sendMessage("progress", "Đã bấm not now");
+          } else {
+            this.sendMessage(
+              "progress",
+              `Không tìm thấy nút not now hoặc skip cho ${email}, tiếp tục...`,
+            );
+          }
         }
       } catch (error) {
         // Ignore if not found
