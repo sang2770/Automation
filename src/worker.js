@@ -386,8 +386,8 @@ function isValidEmail_(email) {
           "--lang=en-US,en",
         ],
         executablePath:
-          "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-        // "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          // "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
       });
 
       // await this.applyContextStealth(browser, stealthProfile);
@@ -475,7 +475,7 @@ function isValidEmail_(email) {
           );
           await this.delay(1000);
           await page.click(
-            'button:has-text("/Next|Tiếp tục/"), button[type="submit"]',
+            'button:has-text("/Next/"), button[type="submit"]',
           );
           await this.delay(5000);
         } else {
@@ -500,9 +500,7 @@ function isValidEmail_(email) {
             const text = button.innerText.toLowerCase();
             return (
               text.includes("not now") ||
-              text.includes("skip") ||
-              text.includes("bỏ qua") ||
-              text.includes("để sau")
+              text.includes("skip")
             );
           });
           if (targetButton) {
@@ -521,7 +519,7 @@ function isValidEmail_(email) {
         ) {
           await page
             .locator(
-              'button:has-text("/Not now|Bỏ qua/"), button:has-text("/Skip|Tiếp tục/")',
+              'button:has-text("/Not now/"), button:has-text("/Skip/")',
             )
             .click();
           await this.delay(2000);
@@ -545,14 +543,14 @@ function isValidEmail_(email) {
         await page.evaluate(() => {
           const cancelButton = Array.from(
             document.querySelectorAll("div span"),
-          ).find((item) => item.innerText.toLowerCase() === "huỷ");
+          ).find((item) => item.innerText.toLowerCase() === "cancel");
           if (cancelButton) {
             cancelButton.click();
           }
 
           const skipButton = Array.from(
             document.querySelectorAll("div span"),
-          ).find((item) => item.innerText.toLowerCase() === "bỏ qua");
+          ).find((item) => item.innerText.toLowerCase() === "skip");
           if (skipButton) {
             skipButton.click();
           }
@@ -635,30 +633,98 @@ function isValidEmail_(email) {
       ]);
 
       await newPage.waitForLoadState();
-      await this.delay(5000);
+      await this.delay(10000);
+      const checkError = async () => {
+        try {
+          console.log("Checking for error message...");
+          const checkResult = await newPage.evaluate(() => {
+            const text = document.body.innerText || "";
+            console.log(text, text.includes("Failed to create a script for user"), text.includes("Something went wrong"));
+            // Detect errors
+            if (text.includes("Failed to create a script for user")) {
+              return {
+                hasError: true,
+                type: "FAILED_CREATE_SCRIPT",
+              };
+            }
 
-      try {
-        // Check "Something went wrong" error
+            if (text.includes("Something went wrong")) {
+              return {
+                hasError: true,
+                type: "SOMETHING_WENT_WRONG",
+              };
+            }
 
-        const errorLocator = newPage
-          .locator(
-            'div:has-text("Failed to create a script for user"), ' +
-              'div:has-text("Something went wrong"), ' +
-              'div:has-text("Đã xảy ra lỗi")',
-          )
-          .first();
+            return {
+              hasError: false,
+            };
+          });
 
-        if (await errorLocator.isVisible({ timeout: 10000 })) {
-          await this.delay(5000);
-          console.log("Detected 'Something went wrong' error, refreshing page...");
-          await newPage.reload();
+          if (checkResult.hasError) {
+            console.log(
+              `Detected error: ${checkResult.type}, trying reload...`
+            );
+
+            await this.delay(5000);
+            // Try click Reload button first
+            const clickedReload = await newPage.evaluate(() => {
+              const elements = [
+                ...document.querySelectorAll('button, [role="button"]'),
+              ];
+
+              const reloadBtn = elements.find(el =>
+                el.innerText?.trim().toLowerCase() === "reload"
+              );
+
+              console.log(elements, reloadBtn);
+
+              if (!reloadBtn) {
+                return false;
+              }
+
+              try {
+                reloadBtn.scrollIntoView({
+                  block: "center",
+                  inline: "center",
+                });
+              } catch (_) { }
+
+              reloadBtn.click();
+
+              return true;
+            });
+
+            if (clickedReload) {
+              console.log("Clicked Reload button");
+            } else {
+              console.log(
+                "Reload button not found, reloading page..."
+              );
+              await newPage.reload();
+            }
+
+            await this.delay(5000);
+          } else {
+            console.log("No error detected, continuing...");
+            return true;
+          }
+          return false;
+        } catch (error) {
+          console.log(
+            "Error while checking page:",
+            error?.message || error
+          );
         }
-      } catch (error) {
-        console.log(
-          "No 'Something went wrong' error detected, continuing...",
-          error.message,
-        );
       }
+
+      for (let i = 0; i < 10; i++) {
+        const res = await checkError();
+        if (res) {
+          break;
+        }
+        await this.delay(5000);
+      }
+
       // Execute functions in Apps Script
       await this.executeFunction(newPage, this.getPermissionRequiredFunction());
       this.sendMessage("progress", `Permission function executed for ${email}`);
@@ -809,13 +875,11 @@ function isValidEmail_(email) {
     recheck = false,
   ) {
     try {
-      await this.delay(10000);
       try {
-        await newPage.click("text=/Review Permissions|Xem lại quyền", {
-          timeout: 15000,
-        });
+        await page.locator('button:has-text("Review permissions")').click();
         console.log("Clicked Review Permissions button");
       } catch {
+        console.log("No Review Permissions button, checking for dialog...");
         await newPage.evaluate(async () => {
           let attempts = 0;
           const maxAttempts = 10;
@@ -838,14 +902,9 @@ function isValidEmail_(email) {
             attempts++;
           }
           await new Promise((res) => setTimeout(res, 5000));
-          const buttonSelectorList = [
-            "[role='dialog'] button:nth-child(2)",
-            "button:has-text('/Allow|Cho phép/')",
-            "button:has-text('/Continue|Tiếp tục/')",
-          ];
-          const btn = buttonSelectorList
-            .map((selector) => document.querySelector(selector))
-            .find((el) => el);
+          const btn = [...document.querySelectorAll("button")]
+            .find((el) => el.innerText.includes("Review permissions"));
+
           if (!btn) {
             console.log("No button found to click in permission dialog");
             return;
@@ -886,19 +945,19 @@ function isValidEmail_(email) {
       // Click "Go to Untitled project (unsafe)"
       await reviewPermissionsPage
         .locator(
-          "text=/Go to Untitled project \\(unsafe\\)|Đi tới Dự án không có tiêu đề \\(không an toàn\\)/",
+          "text=/Go to Untitled project \\(unsafe\\)/",
         )
         .click({ timeout: 10000 });
 
       // Click "Continue"
       await reviewPermissionsPage
-        .locator("button:has-text(/Continue|Tiếp tục/)")
+        .locator("button:has-text(/Continue/)")
         .click({ timeout: 10000 });
 
       // Select all permissions
       try {
         await reviewPermissionsPage
-          .locator("text=/Select all|Chọn tất cả/")
+          .locator("text=/Select all/")
           .click({ timeout: 10000 });
       } catch (error) {
         await reviewPermissionsPage.evaluate(() => {
@@ -915,12 +974,12 @@ function isValidEmail_(email) {
 
       // Click Continue again
       await reviewPermissionsPage
-        .locator('button:has-text("/Continue|Tiếp tục/")')
+        .locator('button:has-text("/Continue/")')
         .click({ timeout: 10000 });
 
       // Wait for execution completed
       await newPage.waitForSelector(
-        'div:has-text("/Execution completed|Đã hoàn tất quá trình thực thi/")',
+        'div:has-text("/Execution completed/")',
         {
           timeout: 60000,
         },
@@ -955,11 +1014,7 @@ function isValidEmail_(email) {
               const errorDiv = Array.from(texts).find(
                 (div) =>
                   div.textContent.includes("Exceeded maximum execution time") ||
-                  div.textContent.includes("too many times") ||
-                  div.textContent.includes("quá nhiều lần") ||
-                  div.textContent.includes(
-                    "vượt quá thời gian thực thi tối đa",
-                  ),
+                  div.textContent.includes("too many times"),
               );
 
               if (errorDiv) {
@@ -968,8 +1023,7 @@ function isValidEmail_(email) {
 
               const success = Array.from(texts).find(
                 (div) =>
-                  div.textContent.includes("Execution completed") ||
-                  div.textContent.includes("Đã hoàn tất quá trình thực thi"),
+                  div.textContent.includes("Execution completed"),
               );
 
               if (success) {
