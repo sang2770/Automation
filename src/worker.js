@@ -386,8 +386,8 @@ function isValidEmail_(email) {
           "--lang=en-US,en",
         ],
         executablePath:
-          // "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        // "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
       });
 
       // await this.applyContextStealth(browser, stealthProfile);
