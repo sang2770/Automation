@@ -402,9 +402,14 @@ function isValidEmail_(email) {
       });
 
       // Enter email
-      await page.fill('input[type="email"]', email, {
-        timeout: 30000,
-      });
+      await page.fill(
+        'input#identifierId, input[name="identifier"], input[type="email"]',
+        email,
+        {
+          timeout: 30000,
+        },
+      );
+
       await this.delay(1000);
       await page.click("#identifierNext");
       await page.waitForTimeout(2000);
@@ -474,9 +479,7 @@ function isValidEmail_(email) {
             secretKey,
           );
           await this.delay(1000);
-          await page.click(
-            'button:has-text("/Next/"), button[type="submit"]',
-          );
+          await page.click('button:has-text("/Next/"), button[type="submit"]');
           await this.delay(5000);
         } else {
           this.sendMessage(
@@ -498,10 +501,7 @@ function isValidEmail_(email) {
           const buttons = Array.from(document.querySelectorAll("button"));
           const targetButton = buttons.find((button) => {
             const text = button.innerText.toLowerCase();
-            return (
-              text.includes("not now") ||
-              text.includes("skip")
-            );
+            return text.includes("not now") || text.includes("skip");
           });
           if (targetButton) {
             targetButton.click();
@@ -512,30 +512,23 @@ function isValidEmail_(email) {
 
         if (
           await page
-            .locator(
-              'button:has-text("Not now"), button:has-text("Skip")',
-            )
+            .locator('button:has-text("Not now"), button:has-text("Skip")')
             .isVisible()
         ) {
           await page
-            .locator(
-              'button:has-text("Not now"), button:has-text("Skip")',
-            )
+            .locator('button:has-text("Not now"), button:has-text("Skip")')
             .click();
           await this.delay(2000);
           this.sendMessage("progress", "Đã bấm not now");
         } else {
-          let isClicked
+          let isClicked;
           try {
             // Array.from(document.querySelectorAll("button")).find(item => item.innerText === "Not now").click()
             isClicked = await page.evaluate(() => {
               const buttons = Array.from(document.querySelectorAll("button"));
               const targetButton = buttons.find((button) => {
                 const text = button.innerText.toLowerCase();
-                return (
-                  text.includes("not now") ||
-                  text.includes("skip")
-                );
+                return text.includes("not now") || text.includes("skip");
               });
               if (targetButton) {
                 targetButton.click();
@@ -664,7 +657,11 @@ function isValidEmail_(email) {
           console.log("Checking for error message...");
           const checkResult = await newPage.evaluate(() => {
             const text = document.body.innerText || "";
-            console.log(text, text.includes("Failed to create a script for user"), text.includes("Something went wrong"));
+            console.log(
+              text,
+              text.includes("Failed to create a script for user"),
+              text.includes("Something went wrong"),
+            );
             // Detect errors
             if (text.includes("Failed to create a script for user")) {
               return {
@@ -687,7 +684,7 @@ function isValidEmail_(email) {
 
           if (checkResult.hasError) {
             console.log(
-              `Detected error: ${checkResult.type}, trying reload...`
+              `Detected error: ${checkResult.type}, trying reload...`,
             );
 
             await this.delay(5000);
@@ -697,8 +694,8 @@ function isValidEmail_(email) {
                 ...document.querySelectorAll('button, [role="button"]'),
               ];
 
-              const reloadBtn = elements.find(el =>
-                el.innerText?.trim().toLowerCase() === "reload"
+              const reloadBtn = elements.find(
+                (el) => el.innerText?.trim().toLowerCase() === "reload",
               );
 
               console.log(elements, reloadBtn);
@@ -712,7 +709,7 @@ function isValidEmail_(email) {
                   block: "center",
                   inline: "center",
                 });
-              } catch (_) { }
+              } catch (_) {}
 
               reloadBtn.click();
 
@@ -722,9 +719,7 @@ function isValidEmail_(email) {
             if (clickedReload) {
               console.log("Clicked Reload button");
             } else {
-              console.log(
-                "Reload button not found, reloading page..."
-              );
+              console.log("Reload button not found, reloading page...");
               await newPage.reload();
             }
 
@@ -735,12 +730,9 @@ function isValidEmail_(email) {
           }
           return false;
         } catch (error) {
-          console.log(
-            "Error while checking page:",
-            error?.message || error
-          );
+          console.log("Error while checking page:", error?.message || error);
         }
-      }
+      };
 
       for (let i = 0; i < 10; i++) {
         const res = await checkError();
@@ -927,8 +919,9 @@ function isValidEmail_(email) {
             attempts++;
           }
           await new Promise((res) => setTimeout(res, 5000));
-          const btn = [...document.querySelectorAll("button")]
-            .find((el) => el.innerText.includes("Review permissions"));
+          const btn = [...document.querySelectorAll("button")].find((el) =>
+            el.innerText.includes("Review permissions"),
+          );
 
           if (!btn) {
             console.log("No button found to click in permission dialog");
@@ -973,14 +966,19 @@ function isValidEmail_(email) {
         await reviewPermissionsPage.evaluate(() => {
           const links = document.querySelectorAll("a");
           const advancedLink = Array.from(links).find((link) =>
-            link.textContent.trim().toLocaleLowerCase().includes("advanced")
+            link.textContent.trim().toLocaleLowerCase().includes("advanced"),
           );
-          advancedLink.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-          advancedLink.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-          advancedLink.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          advancedLink.dispatchEvent(
+            new MouseEvent("mousedown", { bubbles: true }),
+          );
+          advancedLink.dispatchEvent(
+            new MouseEvent("mouseup", { bubbles: true }),
+          );
+          advancedLink.dispatchEvent(
+            new MouseEvent("click", { bubbles: true }),
+          );
         });
       }
-
 
       // Click "Go to Untitled project (unsafe)"
       try {
@@ -991,11 +989,20 @@ function isValidEmail_(email) {
         await reviewPermissionsPage.evaluate(() => {
           const links = document.querySelectorAll("a");
           const advancedLink = Array.from(links).find((link) =>
-            link.textContent.trim().toLocaleLowerCase().includes("go to untitled project (unsafe)")
+            link.textContent
+              .trim()
+              .toLocaleLowerCase()
+              .includes("go to untitled project (unsafe)"),
           );
-          advancedLink.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-          advancedLink.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-          advancedLink.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          advancedLink.dispatchEvent(
+            new MouseEvent("mousedown", { bubbles: true }),
+          );
+          advancedLink.dispatchEvent(
+            new MouseEvent("mouseup", { bubbles: true }),
+          );
+          advancedLink.dispatchEvent(
+            new MouseEvent("click", { bubbles: true }),
+          );
         });
       }
 
@@ -1008,11 +1015,17 @@ function isValidEmail_(email) {
         await reviewPermissionsPage.evaluate(() => {
           const buttons = document.querySelectorAll("button");
           const continueButton = Array.from(buttons).find((button) =>
-            button.textContent.trim().toLocaleLowerCase().includes("continue")
+            button.textContent.trim().toLocaleLowerCase().includes("continue"),
           );
-          continueButton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-          continueButton.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-          continueButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          continueButton.dispatchEvent(
+            new MouseEvent("mousedown", { bubbles: true }),
+          );
+          continueButton.dispatchEvent(
+            new MouseEvent("mouseup", { bubbles: true }),
+          );
+          continueButton.dispatchEvent(
+            new MouseEvent("click", { bubbles: true }),
+          );
         });
       }
 
@@ -1043,21 +1056,24 @@ function isValidEmail_(email) {
         await reviewPermissionsPage.evaluate(() => {
           const buttons = document.querySelectorAll("button");
           const continueButton = Array.from(buttons).find((button) =>
-            button.textContent.trim().toLocaleLowerCase().includes("continue")
+            button.textContent.trim().toLocaleLowerCase().includes("continue"),
           );
-          continueButton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-          continueButton.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-          continueButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          continueButton.dispatchEvent(
+            new MouseEvent("mousedown", { bubbles: true }),
+          );
+          continueButton.dispatchEvent(
+            new MouseEvent("mouseup", { bubbles: true }),
+          );
+          continueButton.dispatchEvent(
+            new MouseEvent("click", { bubbles: true }),
+          );
         });
       }
 
       // Wait for execution completed
-      await newPage.waitForSelector(
-        'div:has-text("Execution completed")',
-        {
-          timeout: 60000,
-        },
-      );
+      await newPage.waitForSelector('div:has-text("Execution completed")', {
+        timeout: 60000,
+      });
     } catch (error) {
       this.sendMessage(
         "info",
@@ -1095,9 +1111,8 @@ function isValidEmail_(email) {
                 return { timeout: true };
               }
 
-              const success = Array.from(texts).find(
-                (div) =>
-                  div.textContent.includes("Execution completed"),
+              const success = Array.from(texts).find((div) =>
+                div.textContent.includes("Execution completed"),
               );
 
               if (success) {
