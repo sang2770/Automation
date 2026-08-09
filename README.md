@@ -1,17 +1,13 @@
 # WAV Mixer Electron
 
-An automated tool to mix WAV files from 3 input folders based on user-defined counts and total duration.
+An automated tool to mix MP3 files from 2 input folders based on user-defined counts.
 
 ## Features
 
-- **3 Input Sources**: Select folders for Input 1, 2, and 3.
+- **2 Input Sources**: Select folders for Input 1 and 2.
 - **Random Selection**: Specify the number of files to pick from each folder.
-- **Loop Mode**:
-  - Automatically calculates ending duration (Input 3).
-  - Loops Input 1 + Input 2 until the total duration is met.
-  - Appends Input 3 as the ending.
-- **No Loop Mode**: Concatenates selected files once (Input 1 -> Input 2 -> Input 3).
-- **Group 2 Output**: Mirrors Input 1 and Input 2 only.
+- **Loop Mode**: Tick the repeat checkbox to concatenate Input 1 + Input 2 for the selected number of cycles.
+- **No Loop Mode**: Concatenates selected files once (Input 1 -> Input 2).
 - **Audio Processing**: Uses `fluent-ffmpeg` for seamless concatenation.
 
 ## How to Run
@@ -29,4 +25,4 @@ An automated tool to mix WAV files from 3 input folders based on user-defined co
 ## Requirements
 
 - Node.js
-- WAV files in input folders.
+- MP3 files in input folders.

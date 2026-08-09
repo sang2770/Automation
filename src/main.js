@@ -163,12 +163,9 @@ ipcMain.handle("process:start", async (event, config) => {
   const {
     input1,
     input2,
-    input3,
-    group2input1,
-    group2input2,
-    group2input3,
     output,
     runCount = 1,
+    repeatEnabled = false,
     repeatCount = 1,
   } = config;
 
@@ -180,65 +177,35 @@ ipcMain.handle("process:start", async (event, config) => {
 
   const processSingleRun = async (runIndex) => {
     log(`\n=== Bắt đầu lần chạy ${runIndex}/${runCount} ===`);
-    const g1Result = await processSingleOutput(runIndex);
-    log(`[Run ${runIndex}] Bắt đầu tạo Output 2 (Group 2)...`);
-    await processGroup2Output(runIndex, g1Result.group2SourceFiles);
+    await processSingleOutput(runIndex);
   };
 
   const processSingleOutput = async (runIndex) => {
     const finalList = [];
     const originalFilesList = []; // Track all original MP3 file paths
-    const group2SourceFiles = []; // Track only files that Group 2 should mirror
-
-    // ==============================
-    // 2️⃣ BUILD MAIN LIST (1+2) * repeatCount + 3
-    // ==============================
-
-    let mainList = [];
-    let currentDuration = 0;
 
     const files1 = getRandomFiles(input1.path, input1.count);
     const files2 = getRandomFiles(input2.path, input2.count);
-    const files3 = getRandomFiles(input3.path, input3.count);
 
-    if (files1.length === 0 && files2.length === 0 && files3.length === 0)
+    if (files1.length === 0 && files2.length === 0)
       throw new Error("Không tìm thấy file trong các thư mục Input.");
 
-    // Lặp lại (Input 1 + 2) repeatCount lần
-    for (let rep = 0; rep < repeatCount; rep++) {
+    const cycles = repeatEnabled ? Math.max(1, Number(repeatCount) || 1) : 1;
+
+    // Ghép Input 1 + Input 2; chỉ lặp khi người dùng bật checkbox.
+    for (let rep = 0; rep < cycles; rep++) {
       const allFilesForRepeat = [
-        { files: files1, group: 1 },
-        { files: files2, group: 2 },
+        files1,
+        files2,
       ];
 
-      for (const item of allFilesForRepeat) {
-        for (const file of item.files) {
-          mainList.push(file);
+      for (const files of allFilesForRepeat) {
+        for (const file of files) {
+          finalList.push(file);
           originalFilesList.push(file);
-          group2SourceFiles.push({ path: file, group: item.group });
-          currentDuration += await getDuration(file);
         }
       }
     }
-
-    // Thêm Input 3 một lần duy nhất vào cuối
-    for (const file of files3) {
-      mainList.push(file);
-      originalFilesList.push(file);
-      group2SourceFiles.push({ path: file, group: 3 });
-      currentDuration += await getDuration(file);
-    }
-
-    // ==============================
-    // 3️⃣ GHÉP ENDING
-    // ==============================
-
-    finalList.push(...mainList);
-
-
-    // ==============================
-    // 4️⃣ VERIFY FINAL DURATION
-    // ==============================
 
     let verify = 0;
     for (const f of finalList) {
@@ -253,47 +220,8 @@ ipcMain.handle("process:start", async (event, config) => {
       finalList,
       originalFilesList,
       verify,
-      'G1',
     );
-
-    return {
-      ...g1Output,
-      group2SourceFiles,
-    };
-  };
-
-  const processGroup2Output = async (runIndex, group1Files) => {
-    const originalFilesList2 = [];
-    const finalList = [];
-
-    log(`[Run ${runIndex}] Tạo Output 2 từ danh sách bài của Output 1...`);
-
-    for (const item of group1Files) {
-      const origFile = item.path;
-      const groupIdx = item.group;
-      const fileName = path.basename(origFile);
-
-      let g2Dir = null;
-      if (groupIdx === 1) g2Dir = group2input1.path;
-      else if (groupIdx === 2) g2Dir = group2input2.path;
-      else if (groupIdx === 3) g2Dir = group2input3.path;
-
-      if (!g2Dir)
-        throw new Error(`Không thể xác định thư mục Group 2 cho file: ${fileName} (Nhóm ${groupIdx})`);
-
-      const g2FilePath = path.join(g2Dir, fileName);
-      if (!fs.existsSync(g2FilePath))
-        throw new Error(`Group 2 thiếu file: "${fileName}" trong "${g2Dir}"`);
-
-      finalList.push(g2FilePath);
-      originalFilesList2.push(g2FilePath);
-    }
-
-    let verify = 0;
-    for (const f of finalList) verify += await getDuration(f);
-    log(`[Run ${runIndex}] Group 2 Duration: ${verify.toFixed(3)}s`);
-
-    return await finalizeOutput(runIndex, finalList, originalFilesList2, verify, 'G2');
+    return await finalizeOutput(runIndex, finalList, originalFilesList, verify);
   };
 
   const finalizeOutput = async (
@@ -301,14 +229,13 @@ ipcMain.handle("process:start", async (event, config) => {
     finalList,
     originalFilesList,
     verify,
-    label = 'G1',
   ) => {
     const listPath = path.join(
       app.getPath("temp"),
-      `concat_${runIndex}_${label}_${Date.now()}.txt`,
+      `concat_${runIndex}_${Date.now()}.txt`,
     );
 
-    const outputName = `temp_output_${runIndex}_${label}_${Date.now()}.mp3`;
+    const outputName = `temp_output_${runIndex}_${Date.now()}.mp3`;
     const outputPath = path.join(app.getPath("temp"), outputName);
 
     try {
@@ -333,7 +260,7 @@ ipcMain.handle("process:start", async (event, config) => {
             "-b:a", "192k"
           ])
           .on("progress", (p) => {
-            // log(`[Run ${runIndex}] Joining MP3 (${label})...`);
+            // log(`[Run ${runIndex}] Joining MP3...`);
           })
           .on("error", (err) => {
             log(`Error in ffmpeg joining: ${err.message}`, "error");
@@ -347,8 +274,7 @@ ipcMain.handle("process:start", async (event, config) => {
       // 📝 EXPORT FINAL FILE & LOG
       // ==============================
 
-      const suffix = label === 'G2' ? '_G2' : '';
-      const finalOutputName = `output_${runIndex}${suffix}_${Date.now()}.mp3`;
+      const finalOutputName = `output_${runIndex}_${Date.now()}.mp3`;
       const finalOutputPath = path.join(output, finalOutputName);
 
       if (!fs.existsSync(outputPath)) {
@@ -375,7 +301,7 @@ ipcMain.handle("process:start", async (event, config) => {
       const logFilePath = path.join(output, logFileName);
 
       let logFileContent = "";
-      logFileContent += `Run: ${runIndex}/${runCount} (${label})\n`;
+      logFileContent += `Run: ${runIndex}/${runCount}\n`;
       logFileContent += `Output file: ${finalOutputName}\n`;
       logFileContent += `Tổng số file ghép: ${finalList.length}\n`;
       logFileContent += `Duration actual: ${verify.toFixed(3)}s\n`;
@@ -395,9 +321,9 @@ ipcMain.handle("process:start", async (event, config) => {
       });
 
       fs.writeFileSync(logFilePath, logFileContent, "utf-8");
-      log(`[Run ${runIndex}] Đã tạo file log (${label}): ${logFileName}`);
+      log(`[Run ${runIndex}] Đã tạo file log: ${logFileName}`);
 
-      log(`✓ Hoàn thành Run ${runIndex} (${label}): ${finalOutputName}`, "success");
+      log(`✓ Hoàn thành Run ${runIndex}: ${finalOutputName}`, "success");
 
       return {
         path: finalOutputPath,
@@ -407,7 +333,7 @@ ipcMain.handle("process:start", async (event, config) => {
         originalFiles: originalFilesList,
       };
     } catch (error) {
-      log(`[Run ${runIndex}] Lỗi trong finalizeOutput (${label}): ${error.message}`, "error");
+      log(`[Run ${runIndex}] Lỗi trong finalizeOutput: ${error.message}`, "error");
 
       // Dọn dẹp file tạm nếu có lỗi xảy ra
       try {
@@ -435,22 +361,16 @@ ipcMain.handle("process:start", async (event, config) => {
 
     if (
       !fs.existsSync(input1.path) ||
-      !fs.existsSync(input2.path) ||
-      !fs.existsSync(input3.path)
+      !fs.existsSync(input2.path)
     ) {
-      throw new Error("Một hoặc nhiều thư mục đầu vào Group 1 không tồn tại.");
-    }
-
-    if (
-      !fs.existsSync(group2input1.path) ||
-      !fs.existsSync(group2input2.path) ||
-      !fs.existsSync(group2input3.path)
-    ) {
-      throw new Error("Một hoặc nhiều thư mục đầu vào Group 2 không tồn tại.");
+      throw new Error("Một hoặc nhiều thư mục đầu vào không tồn tại.");
     }
 
     const maxConcurrency = 5; // Giới hạn số luồng FFmpeg chạy song song
-    log(`Bắt đầu xử lý ${runCount} lần (lặp lại Input 1+2 ${repeatCount} lần)...`);
+    const repeatMessage = repeatEnabled
+      ? `lặp ${repeatCount} vòng`
+      : "không lặp";
+    log(`Bắt đầu xử lý ${runCount} lần (${repeatMessage})...`);
 
     const executing = new Set();
     const promises = [];
@@ -472,7 +392,7 @@ ipcMain.handle("process:start", async (event, config) => {
 
     sender.send(
       "process:complete",
-      `Thành công! Đã tạo ${runCount * 2} file output (${runCount} G1 + ${runCount} G2).`,
+      `Thành công! Đã tạo ${runCount} file output.`,
     );
   } catch (err) {
     log(`Error: ${err.message}`, "error");
