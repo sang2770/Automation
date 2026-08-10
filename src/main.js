@@ -88,25 +88,38 @@ ipcMain.handle("settings:save", async (event, settings) => {
   }
 });
 
-// Helper: Get random files from folder
+const SUPPORTED_AUDIO_EXTENSIONS = new Set([".mp3", ".wav"]);
+
+// Helper: Get a random sample of audio files from a folder.
 function getRandomFiles(dir, count) {
   try {
     if (!fs.existsSync(dir)) return [];
 
     const files = fs
       .readdirSync(dir)
-      .filter((f) => f.toLowerCase().endsWith(".mp3"));
+      .filter((f) => SUPPORTED_AUDIO_EXTENSIONS.has(path.extname(f).toLowerCase()))
+      .filter((f) => {
+        try {
+          return fs.statSync(path.join(dir, f)).isFile();
+        } catch {
+          return false;
+        }
+      });
 
     if (files.length === 0) return [];
 
-    const selected = new Set();
+    const requestedCount = Math.max(0, Math.floor(Number(count) || 0));
+    const shuffled = [...files];
 
-    while (selected.size < Math.min(count, files.length)) {
-      const randomIndex = Math.floor(Math.random() * files.length);
-      selected.add(files[randomIndex]);
+    // Fisher-Yates gives a random, non-repeating sample.
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const randomIndex = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[i]];
     }
 
-    return [...selected].map((f) => path.join(dir, f));
+    return shuffled
+      .slice(0, Math.min(requestedCount, shuffled.length))
+      .map((f) => path.join(dir, f));
   } catch (err) {
     console.error(`Error reading dir ${dir}:`, err);
     return [];
@@ -182,13 +195,17 @@ ipcMain.handle("process:start", async (event, config) => {
 
   const processSingleOutput = async (runIndex) => {
     const finalList = [];
-    const originalFilesList = []; // Track all original MP3 file paths
+    const originalFilesList = []; // Track all original audio file paths
 
     const files1 = getRandomFiles(input1.path, input1.count);
     const files2 = getRandomFiles(input2.path, input2.count);
 
     if (files1.length === 0 && files2.length === 0)
-      throw new Error("Không tìm thấy file trong các thư mục Input.");
+      throw new Error("Không tìm thấy file MP3 hoặc WAV trong các thư mục Input.");
+
+    log(
+      `[Run ${runIndex}] Chọn ngẫu nhiên ${files1.length} bài từ Input 1 và ${files2.length} bài từ Input 2.`,
+    );
 
     const cycles = repeatEnabled ? Math.max(1, Number(repeatCount) || 1) : 1;
 
@@ -215,12 +232,6 @@ ipcMain.handle("process:start", async (event, config) => {
     log(`[Run ${runIndex}] Duration cuối cùng: ${verify.toFixed(3)}s`);
 
 
-    const g1Output = await finalizeOutput(
-      runIndex,
-      finalList,
-      originalFilesList,
-      verify,
-    );
     return await finalizeOutput(runIndex, finalList, originalFilesList, verify);
   };
 
@@ -230,29 +241,35 @@ ipcMain.handle("process:start", async (event, config) => {
     originalFilesList,
     verify,
   ) => {
-    const listPath = path.join(
-      app.getPath("temp"),
-      `concat_${runIndex}_${Date.now()}.txt`,
-    );
-
     const outputName = `temp_output_${runIndex}_${Date.now()}.mp3`;
     const outputPath = path.join(app.getPath("temp"), outputName);
 
     try {
       // ==============================
-      // 5️⃣ CONCAT MP3 FILES DIRECTLY
+      // 5️⃣ CONCAT AUDIO FILES
+      // Normalize each input stream first so MP3 and WAV can be mixed.
       // ==============================
 
-      const listContent = finalList
-        .map((f) => `file '${f.replace(/'/g, "'\\''")}'`)
-        .join("\n");
+      const command = ffmpeg();
+      const normalizedLabels = finalList.map((_, index) => `audio${index}`);
+      const filters = finalList.map((_, index) => ({
+        filter: "aformat",
+        options: "sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo",
+        inputs: `${index}:a`,
+        outputs: normalizedLabels[index],
+      }));
 
-      fs.writeFileSync(listPath, listContent);
+      finalList.forEach((file) => command.input(file));
+      filters.push({
+        filter: "concat",
+        options: `n=${finalList.length}:v=0:a=1`,
+        inputs: normalizedLabels,
+        outputs: "joined",
+      });
 
       await new Promise((resolve, reject) => {
-        ffmpeg()
-          .input(listPath)
-          .inputOptions(["-f", "concat", "-safe", "0"])
+        command
+          .complexFilter(filters, "joined")
           .outputOptions([
             "-acodec", "libmp3lame",
             "-ar", "44100",
@@ -295,7 +312,6 @@ ipcMain.handle("process:start", async (event, config) => {
 
       // Dọn dẹp file tạm ngay sau khi copy thành công
       if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-      if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
 
       const logFileName = finalOutputName.replace(".mp3", "_log.txt");
       const logFilePath = path.join(output, logFileName);
@@ -337,7 +353,6 @@ ipcMain.handle("process:start", async (event, config) => {
 
       // Dọn dẹp file tạm nếu có lỗi xảy ra
       try {
-        if (fs.existsSync(listPath)) fs.unlinkSync(listPath);
         if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
       } catch (cleanupErr) {
         console.error("Lỗi khi dọn dẹp trong catch:", cleanupErr);
