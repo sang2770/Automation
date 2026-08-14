@@ -13,6 +13,7 @@ const runCountInput = document.getElementById('run-count');
 const repeatEnabledInput = document.getElementById('repeat-enabled');
 const repeatCountInput = document.getElementById('repeat-count');
 const repeatCountRow = document.getElementById('repeat-count-row');
+const randomSpeedEnabledInput = document.getElementById('random-speed-enabled');
 
 const btnProcess = document.getElementById('btn-process');
 const logContent = document.getElementById('log-content');
@@ -73,7 +74,8 @@ btnProcess.addEventListener('click', async () => {
         output: paths.output,
         runCount: runCount,
         repeatEnabled: repeatEnabled,
-        repeatCount: repeatCount
+        repeatCount: repeatCount,
+        randomSpeedEnabled: randomSpeedEnabledInput.checked
     };
 
     btnProcess.disabled = true;
@@ -173,7 +175,8 @@ function getSettings() {
         output: paths.output,
         runCount: runCountInput.value,
         repeatEnabled: repeatEnabledInput.checked,
-        repeatCount: repeatCountInput.value
+        repeatCount: repeatCountInput.value,
+        randomSpeedEnabled: randomSpeedEnabledInput.checked
     };
 }
 
@@ -213,6 +216,7 @@ async function loadSettings() {
     repeatCountInput.value = settings.repeatCount || 1;
     // Tương thích với cấu hình cũ: repeatCount > 1 được xem là đang bật lặp.
     repeatEnabledInput.checked = settings.repeatEnabled ?? Number(settings.repeatCount) > 1;
+    randomSpeedEnabledInput.checked = settings.randomSpeedEnabled ?? false;
     updateRepeatControls();
 
     log('Đã tải cấu hình lưu trước đó.', 'success');
@@ -233,6 +237,8 @@ repeatEnabledInput.addEventListener('change', () => {
     updateRepeatControls();
     saveSettings();
 });
+
+randomSpeedEnabledInput.addEventListener('change', saveSettings);
 
 function updateRepeatControls() {
     repeatCountInput.disabled = !repeatEnabledInput.checked;

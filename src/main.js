@@ -180,6 +180,7 @@ ipcMain.handle("process:start", async (event, config) => {
     runCount = 1,
     repeatEnabled = false,
     repeatCount = 1,
+    randomSpeedEnabled = false,
   } = config;
 
   const sender = event.sender;
@@ -232,7 +233,13 @@ ipcMain.handle("process:start", async (event, config) => {
     log(`[Run ${runIndex}] Duration cuối cùng: ${verify.toFixed(3)}s`);
 
 
-    return await finalizeOutput(runIndex, finalList, originalFilesList, verify);
+    return await finalizeOutput(
+      runIndex,
+      finalList,
+      originalFilesList,
+      verify,
+      randomSpeedEnabled,
+    );
   };
 
   const finalizeOutput = async (
@@ -240,6 +247,7 @@ ipcMain.handle("process:start", async (event, config) => {
     finalList,
     originalFilesList,
     verify,
+    shouldRandomizeSpeed,
   ) => {
     const outputName = `temp_output_${runIndex}_${Date.now()}.mp3`;
     const outputPath = path.join(app.getPath("temp"), outputName);
@@ -252,6 +260,14 @@ ipcMain.handle("process:start", async (event, config) => {
 
       const command = ffmpeg();
       const normalizedLabels = finalList.map((_, index) => `audio${index}`);
+      const speedLabels = finalList.map((_, index) => `speed${index}`);
+      const speedFactors = finalList.map(() => {
+        if (!shouldRandomizeSpeed) return 1;
+
+        // Random variation from -15‰ to +15‰ around normal speed.
+        const variation = (Math.random() * 30 - 15) / 1000;
+        return 1 + variation;
+      });
       const filters = finalList.map((_, index) => ({
         filter: "aformat",
         options: "sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo",
@@ -259,13 +275,31 @@ ipcMain.handle("process:start", async (event, config) => {
         outputs: normalizedLabels[index],
       }));
 
+      if (shouldRandomizeSpeed) {
+        finalList.forEach((_, index) => {
+          filters.push({
+            filter: "atempo",
+            options: speedFactors[index].toFixed(6),
+            inputs: normalizedLabels[index],
+            outputs: speedLabels[index],
+          });
+        });
+      }
+
       finalList.forEach((file) => command.input(file));
       filters.push({
         filter: "concat",
         options: `n=${finalList.length}:v=0:a=1`,
-        inputs: normalizedLabels,
+        inputs: shouldRandomizeSpeed ? speedLabels : normalizedLabels,
         outputs: "joined",
       });
+
+      if (shouldRandomizeSpeed) {
+        const speedSummary = speedFactors
+          .map((speed, index) => `${index + 1}: ${speed.toFixed(4)}x`)
+          .join(", ");
+        log(`[Run ${runIndex}] Speed random từng bài: ${speedSummary}`);
+      }
 
       await new Promise((resolve, reject) => {
         command
@@ -321,6 +355,9 @@ ipcMain.handle("process:start", async (event, config) => {
       logFileContent += `Output file: ${finalOutputName}\n`;
       logFileContent += `Tổng số file ghép: ${finalList.length}\n`;
       logFileContent += `Duration actual: ${verify.toFixed(3)}s\n`;
+      if (shouldRandomizeSpeed) {
+        logFileContent += `Random speed: ±1–15‰ quanh 1.0000x\n`;
+      }
       logFileContent += `${"=".repeat(80)}\n`;
       logFileContent += `\n`;
       logFileContent += `Danh sách file theo thứ tự:\n`;
